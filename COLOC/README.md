@@ -30,11 +30,11 @@ R CMD INSTALL
 
 ### Functions:
 
-**indexGWAS** - tabix index a GWAS summary stat file
+**processGWAS** - take a GWAS summary stat file and split by chromosome, sort by position and tabix index
 
     input: GWAS file
 
-    output: tabix indexed GWAS file
+    output: tabix indexed GWAS files
 
     parameters: which columns to use - use EBI GWAS catalogue as default
 
