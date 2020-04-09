@@ -10,6 +10,23 @@ Created by TensorQTL
 
 Use EBI GWAS Catalogue as specification
 
+## Dependencies:
+
+### Utilities:
+
+tabix (ml bcftools/1.9)
+
+### R packages
+
+* arrow 
+
+```
+git clone https://github.com/apache/arrow
+cd arrow/r
+R CMD INSTALL 
+```
+
+* COLOC
 
 ### Functions:
 
