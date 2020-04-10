@@ -1,3 +1,13 @@
+
+# Process GWAS
+# Jack Humphrey
+
+## For a GWAS summary stat table
+## Split by chromosome
+## Sort by position
+## Write out as TSV
+## bgzip and tabix index
+
 library(data.table)
 library(readr)
 library(dplyr)
