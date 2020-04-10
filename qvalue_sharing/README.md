@@ -40,5 +40,14 @@ python prepare_qvalue_sharing.py --source $qtl/FrontalCortex_expression/peer30/F
 Rscript run_qvalue.R --inFile test.tsv --outFile qvalue_res.txt --sourceName FrontalCortex --targetName Cerebellum
 
 ```
-
 qvalue.res.txt is a single row dataFrame containing the values "source", "target" and "pi1"
+
+### Computing all pairwise combinations from two lists of files
+
+pairwise_QTL_sharing.R takes two tables, source (permutation Ps) and target (nominal Ps) files. Each file must be a 2 column table with the following 2 columns:
+
+* name (the name of the dataset)
+* path (the path to the either the cis_qtl.txt.gz permutation file, or the path to the directory containing the nominal parquet files)
+
+
+

@@ -3,10 +3,10 @@ library(optparse)
 library(readr)
 
 option_list <- list(
-        make_option(c('--outFile'), help='the path to the output file', default = ""),
-         make_option(c('--sourceName'), help = "the name of the source P-value distribution", default = "source"),
-        make_option(c('--targetName'), help = 'the name of the target P-value distribution', default = "target"),
-    make_option(c('--inFile'), help = "the concatenated pvalue distribution table")
+        make_option(c('-o', '--outFile'), help='the path to the output file', default = ""),
+         make_option(c('--source_name'), help = "the name of the source P-value distribution", default = "source"),
+        make_option(c('--target_name'), help = 'the name of the target P-value distribution', default = "target"),
+    make_option(c('-i', '--inFile'), help = "the concatenated pvalue distribution table")
 )
 
 option.parser <- OptionParser(option_list=option_list)
@@ -15,8 +15,8 @@ opt <- parse_args(option.parser)
 
 outFile <- opt$outFile
 inFile <- opt$inFile
-sourceName <- opt$sourceName
-targetName <- opt$targetName
+sourceName <- opt$source_name
+targetName <- opt$target_name
 
 df <- read.table(inFile, header=TRUE, sep = "\t")
 
