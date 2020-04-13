@@ -19,25 +19,144 @@
 # run COLOC to get different colocalisations
 # extract top QTL SNP for locus
 # record results in table - GWAS locus, Gene, top QTL SNP, COLOC probabilities
-
-gwas <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
+library(purrr)
+library(readr)
+library(stringr)
+library(arrow)
+gwas_file <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
+qtl_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30.cis_qtl_pairs."
 hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
 
-hits <- read_tsv(hits_file)
 
-makeCoords <- function(df, flank = 1e6){
-    stopifnot( all(c("chr", "pos") %in% names(df) ) )
-    stopifnot( flank > 0)
-    coords <- paste0(df$chr, ":", df$pos - flank, "-",df$pos + flank) 
-    return(coords)
+# flank coordinates by set number of bases (default 1MB)
+# work on either a coordinate string or a dataframe containing chr start and end columns
+makeCoords <- function(input, flank = 1e6){
+    if(all(class(input) == "character")){
+        coord <- parseCoords(input)
+        coord$start <- coord$start - flank
+        coord$end <- coord$end + flank
+        coord <- paste0(coord$chr, ":", coord$start, "-", coord$end)    
+        return(coord)
+    }
+    if( "data.frame" %in% class(input)){
+        stopifnot( all(c("chr", "start", "end") %in% names(input) ) )
+        stopifnot( flank >= 0)
+        coords <- paste0(input$chr, ":", input$start - flank, "-",input$end + flank) 
+        return(coords)
+    }
 }
 
-extractGWAS <- function(coords, gwas, chr){
+parseCoords <- function(coords){
+    split <- as.data.frame(stringr::str_split_fixed(coords, ":|-", 3), stringsAsFactors = FALSE)
+    names(split) <- c("chr", "start","end")
+    split$start <- as.numeric(split$start)
+    split$end <- as.numeric(split$end)
+    return(split)
+}
+
+coords <- makeCoords(hits)
+
+extractGWAS <- function(coord, gwas = gwas_file,chrCol = 3, posCol = 4, betaCol = 15, seCol = 16, pvalCol = 17, mafCol = 20, N = 10000,  verbose = FALSE, GWAStype = "cc", caseProp = 0.5){
     # assume coord is a string following chr:start-end format
-    cmd <- paste("ml bcftools; tabix ", gwas, chr, coords ) 
-    result <- system(cmd, intern = TRUE)
+    chr <- parseCoords(coord)["chr"]
+    cmd <- paste0("ml bcftools; tabix ", gwas, chr, ".tsv.gz ", coord ) 
+    if( verbose == TRUE){
+        print(cmd)
+    }
+    result <- read_tsv(system(cmd, intern = TRUE), col_names = FALSE)
+    #result <- read.table(text = system(cmd, intern = TRUE), sep = "\t", header=FALSE)
+    result$type <- GWAStype
+    
+    names(result)[chrCol] <- "chr"
+    names(result)[posCol] <- "pos"
+    names(result)[pvalCol] <- "pvalues"
+    names(result)[betaCol] <- "beta"
+    names(result)[seCol] <- "varbeta"
+    # convert standard error to the variance
+    result$varbeta <- result$varbeta^2
+    names(result)[mafCol] <- "MAF"
+
+    result$snp <-  paste0(result$chr, ":", result$pos)
+    result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF)
+    
+    result <- as.list(result)
+    
+    result$N <- N
+    result$type <- GWAStype
+    
+    if( GWAStype == "cc" ){
+        result$s <- caseProp
+    }
     return(result)
 }
 
+# extract all nominal QTL P-values overlapping the flanked GWAS hit
+# split by Gene being tested
+extractQTL <- function(coord, qtl = qtl_file, varCol = 2, geneCol = 1, pvalCol = 7, betaCol = 8, seCol = 9, mafCol =4, N = 100 ){
+    coord_split <- parseCoords(coord)
+    stopifnot(nrow(coord_split) == 1)
+    chr <- unlist(coord_split["chr"])
+    parquet_file <- paste0(qtl, chr, ".parquet" )
+    stopifnot(file.exists(parquet_file) )
+    pq <- arrow::read_parquet(parquet_file)
+    variant_pos <- pq[[varCol]]
+    pq$chr <- chr
+    pq$pos <- unlist(parseCoords( variant_pos )["start"])
+    pq$snp <- paste0(chr,':', pq$pos)
+    names(pq)[pvalCol] <- "pvalues"
+    names(pq)[geneCol] <- "gene"
+    names(pq)[betaCol] <- "beta"
+    names(pq)[seCol] <- "varbeta"
+    pq$varbeta <- pq$varbeta^2
+    names(pq)[mafCol] <- "MAF"
+    pq_subset <- 
+        dplyr::select(pq, gene, snp, pos, pvalues, beta, varbeta, MAF) %>%
+        dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
+
+    # split by gene, convert to list
+    pq_split <- 
+        split(pq_subset, pq_subset$gene) %>%
+        purrr::map( ~{ 
+            x = as.list(.x)
+            x$N <- N
+            x$type <- "quant"
+            return(x)
+        })
+    return(pq_split)
+}
+       
+# run COLOC on two datasets
+# first ensure the same variants are in both
+runCOLOC <- function(gwas, qtl, hit){
+    coord <- parseCoords(hit)
+    #coord <- makeCoords(hit, flank = 0)
+    range <- makeCoords(coord, flank = 1e6)
+    # extract GWAS and QTL summary for given coord
+    message(" * extracting GWAS")
+    g <- extractGWAS(range)
+    message(" * extracting QTLs")
+    q <- extractQTL(range)
+    
+    # for testing
+    #q <- q[1:2]
+    # for each gene in QTL list
+    message(" * running COLOC")
+    res <- 
+        purrr::map_df( q, ~{
+            as.data.frame(t(coloc.abf(dataset1 = g, dataset2 = .x)$summary))
+        }, .id = "gene") %>% 
+        dplyr::mutate(variant = hit) %>% 
+        dplyr::select(variant, gene, everything() )
+    return(res) 
+}
 
 
+hits <- read_tsv(hits_file)
+hit_coords <- makeCoords(hits, flank = 0)
+
+res <- purrr::map_df(1:length(hit_coords), ~{
+     message(hit_coords[.x])
+     runCOLOC(gwas,qtl, hit_coords[.x])
+    })
+
+# remove genes where there's no evidence of any association with gene expression ( H0 > 0.5 | H1 > 0.5)

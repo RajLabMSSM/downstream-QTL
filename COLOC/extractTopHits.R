@@ -61,6 +61,6 @@ top_hits <-
 hits_df <- top_hits %>%
     mutate(end = pos + 1 ) %>%
     select(chr, pos, end, everything() ) %>%
-    rename("#chr" = chr, start = pos )
+    rename("chr" = chr, start = pos )
 
 write_tsv(hits_df, path = outFile)
