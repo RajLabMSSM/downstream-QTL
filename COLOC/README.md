@@ -30,7 +30,7 @@ R CMD INSTALL
 
 ### Functions:
 
-**processGWAS** - take a GWAS summary stat file and split by chromosome, sort by position and tabix index
+**processGWAS.R** - take a GWAS summary stat file and split by chromosome, sort by position and tabix index
 
     input: GWAS file
 
@@ -38,13 +38,40 @@ R CMD INSTALL
 
     parameters: which columns to use - use EBI GWAS catalogue as default
 
-**extractTopHits** - from a summary stat file, get out the top hit variants at a given significance threshold (default 1e-8)
+```
+Options:
+    -i INFILE, --inFile=INFILE
+        the full GWAS summary stats
+
+    -o OUTFILE, --outFile=OUTFILE
+        the path to the output file - without file type suffix
+
+    --chrCol=CHRCOL
+        the column number that stores the chromosome of the variant
+
+    --posCol=POSCOL
+        the column number that stores the genomic position of the variant
+
+    --noChrPrefix
+        don't prepend chr to the chromosome column values
+
+    -h, --help
+        Show this help message and exit
+```
+
+This will create a set of individual tabixed chromosome files.
+
+**extractTopHits.R** - from a summary stat file, get out the top hit variants at a given significance threshold (default 1e-8)
 
     input: tabix indeed GWAS file
 
     output: table with coordinates, betas and P-values of top hits
 
     parameters: given significance threshold
+
+
+
+
 
 
 **extractGWAS** - from a summary stat file, extract GWAS statistics within a coordinate range

@@ -8,15 +8,19 @@
 ## Write out as TSV
 ## bgzip and tabix index
 
+## WARNING: this script does not lift over coordinates or flip alleles. You should have done this already.
+
 library(data.table)
 library(readr)
 library(dplyr)
 library(optparse)
 
 option_list <- list(
-        make_option(c('-o', '--outFile'), help='the path to the output file - without file type suffix', default = ""),
     make_option(c('-i', '--inFile'), help = "the full GWAS summary stats"),
-    make_option(c('-t', '--type'), help = "where the GWAS is from. These can be \"EBI\" - more to be added", default = "EBI")
+    make_option(c('-o', '--outFile'), help='the path to the output file - without file type suffix', default = ""),
+    make_option(c('--chrCol'), help = "the column number that stores the chromosome of the variant", default = 3),
+    make_option(c('--posCol'), help = "the column number that stores the genomic position of the variant", default = 4),
+    make_option(c('--noChrPrefix'), help = "don't prepend chr to the chromosome column values", action="store_true", default=FALSE) 
 )
 
 option.parser <- OptionParser(option_list=option_list)
@@ -25,32 +29,39 @@ opt <- parse_args(option.parser)
 
 outFile <- opt$outFile
 inFile <- opt$inFile
-type <- opt$type
-
+chrCol <- opt$chrCol
+posCol <- opt$posCol
+noChrPrefix <- opt$noChrPrefix
 
 # read in full GWAS 
 #gwas <- "../example/nicolas_als_chr21_gwas.tsv.gz"
 #out_prefix <- "nicolas_als"
 
-if( type == "EBI"){
-    col_chr <- "hm_chrom"
-    col_pos <- "hm_pos"
-    num_chr <- 3
-    num_pos <- 4
-    chr_append <- TRUE # should "chr" be appended to the chromosome values?
+if(!is.na(chrCol) & !is.na(posCol) ){
+    num_chr <- chrCol
+    num_pos <- posCol
 }
 
-
 print(" * GWS summary stat processor ")
+
+if( noChrPrefix == TRUE){
+print(" * no adding chr string to chromosomes")
+}else{
+print(" * prepending \"chr\" to chromosome names")
+}
+
 print(" * reading in file")
 gwas_df <- fread(inFile)
 
-if( chr_append == TRUE ){
+col_chr <- names(gwas_df)[num_chr]
+col_pos <- names(gwas_df)[num_pos]
+
+if( noChrPrefix == FALSE ){
 gwas_df[[col_chr]] <- paste0("chr", gwas_df[[col_chr]] )
 }
 
-names(gwas_df)[which(names(gwas_df) == col_chr )] <- "chr"
-names(gwas_df)[which(names(gwas_df) == col_pos )] <- "pos"
+names(gwas_df)[num_chr] <- "chr"
+names(gwas_df)[num_pos] <- "pos"
 
 setkey(gwas_df, "chr")
 # get unique values of chromosome column
