@@ -23,8 +23,9 @@ library(purrr)
 library(readr)
 library(stringr)
 library(arrow)
+library(coloc)
 gwas_file <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
-qtl_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30.cis_qtl_pairs."
+qtl_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30"
 hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
 
 
@@ -54,16 +55,16 @@ parseCoords <- function(coords){
     return(split)
 }
 
-coords <- makeCoords(hits)
-
 extractGWAS <- function(coord, gwas = gwas_file,chrCol = 3, posCol = 4, betaCol = 15, seCol = 16, pvalCol = 17, mafCol = 20, N = 10000,  verbose = FALSE, GWAStype = "cc", caseProp = 0.5){
     # assume coord is a string following chr:start-end format
     chr <- parseCoords(coord)["chr"]
-    cmd <- paste0("ml bcftools; tabix ", gwas, chr, ".tsv.gz ", coord ) 
+    cmd <- paste0( "tabix ", gwas, chr, ".tsv.gz ", coord ) 
     if( verbose == TRUE){
         print(cmd)
     }
-    result <- read_tsv(system(cmd, intern = TRUE), col_names = FALSE)
+    result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
+    #result <- read.table(text = system2(command = "tabix",args = cmd, stdout = TRUE, timeout = 1), sep = "\t", header = FALSE)
+    message(" * GWAS extracted!")
     #result <- read.table(text = system(cmd, intern = TRUE), sep = "\t", header=FALSE)
     result$type <- GWAStype
     
@@ -96,16 +97,31 @@ extractQTL <- function(coord, qtl = qtl_file, varCol = 2, geneCol = 1, pvalCol =
     coord_split <- parseCoords(coord)
     stopifnot(nrow(coord_split) == 1)
     chr <- unlist(coord_split["chr"])
-    parquet_file <- paste0(qtl, chr, ".parquet" )
+
+    perm_file <- paste0(qtl, ".cis_qtl.txt.gz" )
+    stopifnot(file.exists(perm_file) )
+    # get out significant Genes
+    perm_res <- readr::read_tsv(perm_file)
+    perm_res <- dplyr::bind_cols(perm_res, parseCoords(perm_res$variant_id) )
+    sig <- dplyr::filter(perm_res, qval < 0.05 & chr ==  coord_split$chr & start >= coord_split$start & start <= coord_split$end )
+    
+    message( paste0( nrow(sig), " significant genes at this locus" ) )
+    if( nrow(sig) == 0 ){ return(NULL) }
+    
+    parquet_file <- paste0(qtl, ".cis_qtl_pairs.", chr, ".parquet" )
     stopifnot(file.exists(parquet_file) )
     pq <- arrow::read_parquet(parquet_file)
+    
+    names(pq)[geneCol] <- "gene"
+    
+    pq <- dplyr::filter(pq, gene %in% sig$phenotype_id)
+         
     variant_pos <- pq[[varCol]]
     pq$chr <- chr
     pq$pos <- unlist(parseCoords( variant_pos )["start"])
     pq$snp <- paste0(chr,':', pq$pos)
     names(pq)[pvalCol] <- "pvalues"
-    names(pq)[geneCol] <- "gene"
-    names(pq)[betaCol] <- "beta"
+        names(pq)[betaCol] <- "beta"
     names(pq)[seCol] <- "varbeta"
     pq$varbeta <- pq$varbeta^2
     names(pq)[mafCol] <- "MAF"
@@ -127,6 +143,11 @@ extractQTL <- function(coord, qtl = qtl_file, varCol = 2, geneCol = 1, pvalCol =
        
 # run COLOC on two datasets
 # first ensure the same variants are in both
+
+# output a list of objects:
+## COLOC results - this should include the GWAS locus, the gene of interest, the top QTL variant and the top QTL p-value
+## object - this should be a table combining the two input datasets, inner joined on "snp", to be used for plotting.
+
 runCOLOC <- function(gwas, qtl, hit){
     coord <- parseCoords(hit)
     #coord <- makeCoords(hit, flank = 0)
@@ -136,27 +157,43 @@ runCOLOC <- function(gwas, qtl, hit){
     g <- extractGWAS(range)
     message(" * extracting QTLs")
     q <- extractQTL(range)
+    if( is.null(q) ){ return(NULL) }
     
-    # for testing
-    #q <- q[1:2]
-    # for each gene in QTL list
+    top_qtl <- qtl %>% map( )
+    
+     
     message(" * running COLOC")
-    res <- 
+    coloc_res <- 
         purrr::map_df( q, ~{
             as.data.frame(t(coloc.abf(dataset1 = g, dataset2 = .x)$summary))
         }, .id = "gene") %>% 
-        dplyr::mutate(variant = hit) %>% 
-        dplyr::select(variant, gene, everything() )
+        dplyr::mutate(locus = hit) %>% 
+        dplyr::select(locus, gene, everything() )
     return(res) 
 }
 
 
+if( main == TRUE){
+
 hits <- read_tsv(hits_file)
 hit_coords <- makeCoords(hits, flank = 0)
 
-res <- purrr::map_df(1:length(hit_coords), ~{
-     message(hit_coords[.x])
-     runCOLOC(gwas,qtl, hit_coords[.x])
-    })
+#hit_coords <- hit_coords[1]
+#.x <- 1
+#hit_coords <- hit_coords
+all_res <- purrr::map_df(1:length(hit_coords), ~{
+#for( .x in 1:length(hit_coords) ){
+    message(hit_coords[.x])
+    res <- runCOLOC(gwas,qtl, hit_coords[.x])
+    if(is.null(res) ){return(NULL) }
+    #if(is.null(res) ){ next }
+    #print(res)
+    #outFile <- paste0("coloc_test_", hit_coords[.x], ".tsv")    
+    #readr::write_tsv(res, path = outFile)
+    return(res)
+})
+#})
 
-# remove genes where there's no evidence of any association with gene expression ( H0 > 0.5 | H1 > 0.5)
+
+readr::write_tsv(all_res, path = "test_coloc_results.tsv")
+}
