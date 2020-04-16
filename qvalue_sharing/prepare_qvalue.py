@@ -20,6 +20,7 @@ parser.add_option("-t", "--target", dest="target")
 parser.add_option("--source_type", dest="source_type", default = "tensorQTL")
 parser.add_option("--target_type", dest="target_type", default = "tensorQTL")
 parser.add_option("-o", "--output_file", dest="outFile")
+parser.add_option("-m", "--mode", dest="mode")
 (options, args) = parser.parse_args()
 
 source = options.source
@@ -27,6 +28,7 @@ target = options.target
 source_type = options.source_type
 target_type = options.target_type
 outFile = options.outFile
+mode = options.mode
 # inputs:
 ## A permuted P-value list
 
@@ -48,15 +50,20 @@ else:
     print(" * target file: " + target)
 
 # functions
-def readSource(source, source_type):
+# if source is eQTL - gene is phenotype ID
+# if source is sQTL - gene is group ID
+# add argument to set this
+def readSource(source, source_type, mode):
     ## read in permutation file 
     source_df = pd.read_csv(source, sep = "\t")
     
     if source_type == "tensorQTL":
-        geneCol = 'phenotype_id'
         varCol = 'variant_id'
         pCol = 'qval'
-    
+        if mode == "eQTL":
+            geneCol = 'phenotype_id'
+        if mode == "sQTL":
+            geneCol = 'group_id'
     # test if the supposed columns are in the file
 
     # subset source df according to type of input table
@@ -81,12 +88,21 @@ def target_tensorQTL(target, source_sig):
 
     for nom in nom_files:
         print(" * reading : " + nom )
+
         target_df = pq.read_table(nom, columns = ['phenotype_id', 'variant_id', 'pval_nominal']).to_pandas()
+        
+        if mode == "eQTL":
+            geneCol = "phenotype_id" 
+        if mode == "sQTL":
+            geneCol = "group_id"
+            # split off gene from phenotype ID to get group ID
+            target_df["group_id"] = target_df["phenotype_id"].str.split(":", n = 5, expand = True)[4] 
+
         target_df = target_df.rename(columns={"pval_nominal": "target"})
         ## match the two together on shared SNP and Gene columns
-        merge = pd.merge(source_sig,target_df, on = ["phenotype_id", "variant_id"], how = "inner") 
+        ## depending on whether eQTL or sQTL
+        merge = pd.merge(source_sig,target_df, on = [geneCol, "variant_id"], how = "inner") 
         nominal_tables.append(merge)
-
 
     # concatenate together
     print(" * merging files together")
@@ -94,7 +110,7 @@ def target_tensorQTL(target, source_sig):
 
     return(merged_df)
 
-source_sig = readSource(source, source_type)
+source_sig = readSource(source, source_type, mode)
 
 merged_df = target_tensorQTL(target,source_sig)
 

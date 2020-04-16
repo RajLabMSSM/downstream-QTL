@@ -2,10 +2,10 @@ library("tidyverse")
 library(purrr)
 
 
-source_file <- "NYGC_eQTL_permutation_table.tsv"
-target_file <- "NYGC_eQTL_nominal_table.tsv"
+source_file <- "NYGC_sQTL_permutation_table.tsv"
+target_file <- "NYGC_sQTL_nominal_table.tsv"
 
-outFolder <- "NYGC_eQTLs/"
+outFolder <- "NYGC_sQTLs/"
 
 if( !dir.exists(outFolder) ){dir.create(outFolder) }
 

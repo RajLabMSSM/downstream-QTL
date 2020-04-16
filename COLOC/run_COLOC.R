@@ -24,10 +24,7 @@ library(readr)
 library(stringr)
 library(arrow)
 library(coloc)
-gwas_file <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
-qtl_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30"
-hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
-
+library(optparse)
 
 # flank coordinates by set number of bases (default 1MB)
 # work on either a coordinate string or a dataframe containing chr start and end columns
@@ -55,10 +52,10 @@ parseCoords <- function(coords){
     return(split)
 }
 
-extractGWAS <- function(coord, gwas = gwas_file,chrCol = 3, posCol = 4, betaCol = 15, seCol = 16, pvalCol = 17, mafCol = 20, N = 10000,  verbose = FALSE, GWAStype = "cc", caseProp = 0.5){
+extractGWAS <- function(coord, gwas, chrCol = 3, posCol = 4, betaCol = 15, seCol = 16, pvalCol = 17, mafCol = 20, N = 10000,  verbose = FALSE, GWAStype = "cc", caseProp = 0.5){
     # assume coord is a string following chr:start-end format
     chr <- parseCoords(coord)["chr"]
-    cmd <- paste0( "tabix ", gwas, chr, ".tsv.gz ", coord ) 
+    cmd <- paste0( "ml bcftools; tabix ", gwas, chr, ".tsv.gz ", coord ) 
     if( verbose == TRUE){
         print(cmd)
     }
@@ -93,7 +90,7 @@ extractGWAS <- function(coord, gwas = gwas_file,chrCol = 3, posCol = 4, betaCol 
 
 # extract all nominal QTL P-values overlapping the flanked GWAS hit
 # split by Gene being tested
-extractQTL <- function(coord, qtl = qtl_file, varCol = 2, geneCol = 1, pvalCol = 7, betaCol = 8, seCol = 9, mafCol =4, N = 100 ){
+extractQTL <- function(coord, qtl = qtl_prefix, varCol = 2, geneCol = 1, pvalCol = 7, betaCol = 8, seCol = 9, mafCol =4, N = 100 ){
     coord_split <- parseCoords(coord)
     stopifnot(nrow(coord_split) == 1)
     chr <- unlist(coord_split["chr"])
@@ -105,7 +102,7 @@ extractQTL <- function(coord, qtl = qtl_file, varCol = 2, geneCol = 1, pvalCol =
     perm_res <- dplyr::bind_cols(perm_res, parseCoords(perm_res$variant_id) )
     sig <- dplyr::filter(perm_res, qval < 0.05 & chr ==  coord_split$chr & start >= coord_split$start & start <= coord_split$end )
     
-    message( paste0( nrow(sig), " significant genes at this locus" ) )
+    message( paste0( nrow(sig), " significant genes or splicing events at this locus" ) )
     if( nrow(sig) == 0 ){ return(NULL) }
     
     parquet_file <- paste0(qtl, ".cis_qtl_pairs.", chr, ".parquet" )
@@ -148,52 +145,80 @@ extractQTL <- function(coord, qtl = qtl_file, varCol = 2, geneCol = 1, pvalCol =
 ## COLOC results - this should include the GWAS locus, the gene of interest, the top QTL variant and the top QTL p-value
 ## object - this should be a table combining the two input datasets, inner joined on "snp", to be used for plotting.
 
-runCOLOC <- function(gwas, qtl, hit){
+runCOLOC <- function(gwas_prefix, qtl_prefix, hit){
     coord <- parseCoords(hit)
     #coord <- makeCoords(hit, flank = 0)
     range <- makeCoords(coord, flank = 1e6)
     # extract GWAS and QTL summary for given coord
     message(" * extracting GWAS")
-    g <- extractGWAS(range)
+    g <- extractGWAS(range, gwas = gwas_prefix)
+    # get hit info from GWAS
+    hit_snp <- paste(parseCoords(hit)[1:2],collapse = ":")
+    hit_info <- as.data.frame(g, stringsAsFactors = FALSE) %>% filter(snp == hit_snp) %>% select(GWAS_SNP = snp, GWAS_P = pvalues, GWAS_beta = beta, GWAS_MAF = MAF) 
     message(" * extracting QTLs")
-    q <- extractQTL(range)
+    q <- extractQTL(range, qtl = qtl_prefix)
     if( is.null(q) ){ return(NULL) }
-    
-    top_qtl <- qtl %>% map( )
-    
-     
+    # for each gene extract top QTL SNP    
+    qtl_info <- q %>% 
+        map_df( ~{ 
+            as.data.frame(.x, stringsAsFactors=FALSE) %>% 
+            arrange(pvalues) %>% head(1) %>% 
+            select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_MAF = MAF)
+        }) 
     message(" * running COLOC")
     coloc_res <- 
         purrr::map_df( q, ~{
-            as.data.frame(t(coloc.abf(dataset1 = g, dataset2 = .x)$summary))
+            as.data.frame(t(coloc.abf(dataset1 = g, dataset2 = .x)$summary), stringsAsFactors = FALSE)
         }, .id = "gene") %>% 
-        dplyr::mutate(locus = hit) %>% 
-        dplyr::select(locus, gene, everything() )
-    return(res) 
+        dplyr::mutate(GWAS_SNP = paste(parseCoords(hit)[1:2],collapse = ":")  ) %>% 
+        dplyr::select(gene, GWAS_SNP, everything() )
+    # bind coloc_res to other tables
+    full_res <- full_join(qtl_info,
+            full_join(hit_info, coloc_res, by = "GWAS_SNP"), 
+                by = "gene") %>% 
+        select( gene, starts_with("GWAS"), starts_with("QTL"), everything() )
+    return(full_res) 
 }
 
+option_list <- list(
+        make_option(c('-o', '--outFile'), help='the path to the output file', default = ""),
+        make_option(c('-h', '--hitsFile'), help= "the path to a file containing GWAS hits" ),
+        make_option(c('-g', '--gwasDir'), help = "the path to the directory containing GWAS files" ),
+        make_option(c('-p', '--gwasPrefix'), help = "the prefix of the GWAS files"),
+        make_option(c('-q','--qtlDir'), help = "the directory containing QTL nominal results", default = "")
+)
 
-if( main == TRUE){
+option.parser <- OptionParser(option_list=option_list)
+opt <- parse_args(option.parser)
+
+
+outFile <- opt$outFile
+hits_file <- opt$hits_file
+qtl_dir <- opt$qtl_dir
+gwas_dir <- opt$gwas_dir
+gwas_prefix <- opt$gwas_prefix
+
+
+gwas_prefix <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
+#qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30"
+qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_splicing/peer20/LumbarSpinalCord_splicing_peer20"
+
+hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
+outFile <- "test_coloc_results.tsv"
+
+
 
 hits <- read_tsv(hits_file)
 hit_coords <- makeCoords(hits, flank = 0)
-
+# for testing
 #hit_coords <- hit_coords[1]
-#.x <- 1
-#hit_coords <- hit_coords
+
 all_res <- purrr::map_df(1:length(hit_coords), ~{
-#for( .x in 1:length(hit_coords) ){
     message(hit_coords[.x])
-    res <- runCOLOC(gwas,qtl, hit_coords[.x])
+    res <- runCOLOC(gwas_prefix, qtl_prefix, hit = hit_coords[.x])
     if(is.null(res) ){return(NULL) }
-    #if(is.null(res) ){ next }
-    #print(res)
-    #outFile <- paste0("coloc_test_", hit_coords[.x], ".tsv")    
-    #readr::write_tsv(res, path = outFile)
     return(res)
 })
-#})
 
 
-readr::write_tsv(all_res, path = "test_coloc_results.tsv")
-}
+readr::write_tsv(all_res, path = outFile)
