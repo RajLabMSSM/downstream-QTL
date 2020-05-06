@@ -1,4 +1,3 @@
-
 # input:
 
 # directory containing GWAS files
@@ -21,6 +20,7 @@
 # record results in table - GWAS locus, Gene, top QTL SNP, COLOC probabilities
 library(purrr)
 library(readr)
+library(dplyr)
 library(stringr)
 library(arrow)
 library(coloc)
@@ -52,7 +52,7 @@ parseCoords <- function(coords){
     return(split)
 }
 
-extractGWAS <- function(coord, gwas, chrCol = 3, posCol = 4, betaCol = 15, seCol = 16, pvalCol = 17, mafCol = 20, N = 10000,  verbose = FALSE, GWAStype = "cc", caseProp = 0.5){
+extractGWAS <- function(coord, gwas, chrCol = 3, posCol = 4, betaCol = 15, seCol = 16, pvalCol = 17, mafCol = 20, N = 80000,  verbose = FALSE, GWAStype = "cc", caseProp = 0.25){
     # assume coord is a string following chr:start-end format
     chr <- parseCoords(coord)["chr"]
     cmd <- paste0( "ml bcftools; tabix ", gwas, chr, ".tsv.gz ", coord ) 
@@ -182,10 +182,9 @@ runCOLOC <- function(gwas_prefix, qtl_prefix, hit){
 
 option_list <- list(
         make_option(c('-o', '--outFile'), help='the path to the output file', default = ""),
-        make_option(c('-h', '--hitsFile'), help= "the path to a file containing GWAS hits" ),
-        make_option(c('-g', '--gwasDir'), help = "the path to the directory containing GWAS files" ),
-        make_option(c('-p', '--gwasPrefix'), help = "the prefix of the GWAS files"),
-        make_option(c('-q','--qtlDir'), help = "the directory containing QTL nominal results", default = "")
+        make_option(c('--hits'), help= "the path to a file containing GWAS hits" ),
+        make_option(c('-p', '--gwas_prefix'), help = "the prefix of the GWAS files"),
+        make_option(c('-q','--qtl_prefix'), help = "the directory containing QTL nominal results with the prefix of the dataset; eg /results/Brain_expression/peer30/Brain_expression_peer30", default = "")
 )
 
 option.parser <- OptionParser(option_list=option_list)
@@ -193,19 +192,19 @@ opt <- parse_args(option.parser)
 
 
 outFile <- opt$outFile
-hits_file <- opt$hits_file
-qtl_dir <- opt$qtl_dir
-gwas_dir <- opt$gwas_dir
+hits_file <- opt$hits
+qtl_prefix <- opt$qtl_prefix
 gwas_prefix <- opt$gwas_prefix
 
 
-gwas_prefix <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
+#gwas_prefix <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
 #qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30"
-qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_splicing/peer20/LumbarSpinalCord_splicing_peer20"
+#qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_splicing/peer20/LumbarSpinalCord_splicing_peer20"
 
-hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
-outFile <- "test_coloc_results.tsv"
+#hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
+#outFile <- "test_coloc_results.tsv"
 
+options(echo = TRUE)
 
 
 hits <- read_tsv(hits_file)
