@@ -33,22 +33,44 @@ option_list <- list(
 option.parser <- OptionParser(option_list=option_list)
 opt <- parse_args(option.parser)
 
-
-
-db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
 dataset <- opt$dataset
 
-stopifnot( !file.exists(db_path) )
-
-gwas_db <- read_excel(db_path, sheet = 2)
-
-stopifnot( dataset %in% gwas_db$dataset )
 
 
+pullGWAS <- function(dataset){
 
-if(!is.na(chrCol) & !is.na(posCol) ){
-    num_chr <- chrCol
-    num_pos <- posCol
+    db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+    stopifnot( file.exists(db_path) )
+
+    gwas_db <- readxl::read_excel(db_path, sheet = 2)
+
+    stopifnot( dataset %in% gwas_db$dataset )
+
+    gwas <- gwas_db[ gwas_db$dataset == dataset & !is.na(gwas_db$dataset), ]
+    stopifnot( nrow(gwas) == 1 )
+    
+    stopifnot( all( c("full_path", "full_chrom", "full_pos") %in% names(gwas) ) )
+    stopifnot( all( !is.na( c(gwas$full_path, gwas$full_chrom, gwas$full_pos ) ) ) )
+    
+    full_chrom <- gwas$full_chrom
+    full_pos <- gwas$full_pos
+    full_path <- gwas$full_path
+
+    stopifnot( file.exists(full_path) )
+    
+    out <- list(full_chrom = full_chrom, full_pos = full_pos, full_path = full_path)
+    return(out) 
+}
+
+# read in header of summary stat file
+# get out mapping of column names to column numbers
+columnDictionary <- function(file_path){
+  stopifnot(file.exists(file_path) )
+  # Get the index of each column name
+  f <- data.table::fread(file_path, nrows = 0, header = TRUE)
+  cNames <- colnames(f)
+  colDict <- setNames(1:length(cNames), cNames  )
+  return(colDict)
 }
 
 print(" * GWS summary stat processor ")
@@ -60,10 +82,21 @@ print(" * prepending \"chr\" to chromosome names")
 }
 
 print(" * reading in file")
-gwas_df <- fread(inFile)
 
-col_chr <- names(gwas_df)[num_chr]
-col_pos <- names(gwas_df)[num_pos]
+gwas <- pullGWAS(dataset)
+
+col_dict <- columnDictionary(gwas$full_path)
+
+#gwas_df <- data.table(fread(gwass$full_path, threads = 4))
+
+col_chr <- gwas$full_chrom
+col_pos <- gwas$full_pos
+
+# get column numbers
+n_chr <- which(names(col_dict) == col_chr )
+n_pos <- which(names(col_dict) == col_pos )
+
+# chr prefix - insist on it?
 
 if( noChrPrefix == FALSE ){
 gwas_df[[col_chr]] <- paste0("chr", gwas_df[[col_chr]] )
@@ -75,6 +108,22 @@ names(gwas_df)[num_pos] <- "pos"
 setkey(gwas_df, "chr")
 # get unique values of chromosome column
 all_chrs <- unique( gwas_df[,chr] ) 
+
+# CHR NAME ISSUE
+
+sortFile <- function(gwas, col_dict){
+    n_chr <- which(names(col_dict) == gwas$full_chrom )
+    n_pos <- which(names(col_dict) == gwas$full_pos )
+}
+
+
+tabixFile <- function(gwas, col_dict){
+    n_chr <- which(names(col_dict) == gwas$full_chrom )
+    n_pos <- which(names(col_dict) == gwas$full_pos )
+    
+    
+}
+
 
 for(i in all_chrs){
     print(paste0(" * processing ", i ))
