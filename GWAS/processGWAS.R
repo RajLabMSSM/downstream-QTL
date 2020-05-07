@@ -15,27 +15,36 @@ library(readr)
 library(dplyr)
 library(optparse)
 
+#option_list <- list(
+#    make_option(c('-i', '--inFile'), help = "the full GWAS summary stats"),
+#    make_option(c('-o', '--outFile'), help='the path to the output file - without file type suffix', default = ""),
+#    make_option(c('--chrCol'), help = "the column number that stores the chromosome of the variant", default = 3),
+#    make_option(c('--posCol'), help = "the column number that stores the genomic position of the variant", default = 4),
+#    make_option(c('--noChrPrefix'), help = "don't prepend chr to the chromosome column values", action="store_true", default=FALSE) 
+#)
+
+# REFACTORED TO EXCLUSIVELY USE THE RAJ LAB GWAS DATABASE
+
 option_list <- list(
-    make_option(c('-i', '--inFile'), help = "the full GWAS summary stats"),
-    make_option(c('-o', '--outFile'), help='the path to the output file - without file type suffix', default = ""),
-    make_option(c('--chrCol'), help = "the column number that stores the chromosome of the variant", default = 3),
-    make_option(c('--posCol'), help = "the column number that stores the genomic position of the variant", default = 4),
-    make_option(c('--noChrPrefix'), help = "don't prepend chr to the chromosome column values", action="store_true", default=FALSE) 
+    make_option(c('--dataset' ), help='the name of the dataset. This must match the value in the database', default = "")
 )
+
 
 option.parser <- OptionParser(option_list=option_list)
 opt <- parse_args(option.parser)
 
 
-outFile <- opt$outFile
-inFile <- opt$inFile
-chrCol <- opt$chrCol
-posCol <- opt$posCol
-noChrPrefix <- opt$noChrPrefix
 
-# read in full GWAS 
-#gwas <- "../example/nicolas_als_chr21_gwas.tsv.gz"
-#out_prefix <- "nicolas_als"
+db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+dataset <- opt$dataset
+
+stopifnot( !file.exists(db_path) )
+
+gwas_db <- read_excel(db_path, sheet = 2)
+
+stopifnot( dataset %in% gwas_db$dataset )
+
+
 
 if(!is.na(chrCol) & !is.na(posCol) ){
     num_chr <- chrCol
