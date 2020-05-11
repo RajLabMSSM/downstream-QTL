@@ -88,6 +88,7 @@ extractLoci <- function(gwas){
     }
     if( loci_ext %in% c("xlsx", "xlsm") ){
         stopifnot( !is.na(gwas$top_sheet) )
+        stopifnot( gwas$top_sheet %in% readxl::excel_sheets(loci_path) )
         loci_df <- readxl::read_excel(loci_path, sheet = gwas$top_sheet )
     }
     #return(loci_df)
@@ -108,53 +109,76 @@ extractLoci <- function(gwas){
     return(loci_clean)
 }
 
+
+# if MAF isn't present in summary stats then use the UK BB MAF
+matchMAF <- function(result, chr, refFolder =  "/sc/hydra/projects/ad-omics/data/references/GWAS/UKBB_MAF/"){
+    maf_file <- paste0(refFolder, "ukb_mfi_chr", chr, "_v3.txt.gz")
+    stopifnot(file.exists(maf_file) )
+    maf <- data.table::fread(maf_file, nThread = 4,
+                           select = c(3,6),
+                           col.names = c("pos","MAF"))
+    maf <- subset(maf, pos %in% result$pos)
+    merged_DT <- data.table:::merge.data.table(result, maf,
+                                             by = "pos")
+    return(merged_DT)
+}
+
 # extract SNPs within coordinate range from a GWAS summary stat file
 # account for different GWAS having different column naming and ordering with a GWAS_config.yaml file
 # for each GWAS set the column numbers, the number of samples (N), the type of GWAS ("cc" or "quant") and the case proportion
 # and whether the GWAS was hg19 or hg38
-extractGWAS <- function(coord, config){
+extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/data/references/GWAS/"){
     # either read in config.yaml or Brian's CSV table
-    config <- yaml::read_yaml(config) 
+    gwas_path <- file.path( refFolder,  paste0(gwas$dataset, ".processed.tsv.gz" ))
+    if( !file.exists(gwas_path) ){
+        stop("ERROR - processed GWAS not found, make sure you ran process_GWAS.R first")
+    }
+    stopifnot( all(!is.na(c(gwas$full_chrom, gwas$full_pos, gwas$full_p, gwas$full_effect, gwas$full_se) ) ))
+    chrCol <- gwas$full_chrom
+    posCol <- gwas$full_pos
+    pvalCol <- gwas$full_p
+    betaCol <- gwas$full_effect
+    seCol <- gwas$full_se
     
-    gwas <- config$path
-    chrCol <- config$chrCol
-    posCol <- config$posCol
-    pvalCol <- config$pvalCol
-    betaCol <- config$betaCol
-    seCol <- config$seCol
     # assume coord is a string following chr:start-end format
     chr <- parseCoords(coord)["chr"]
     
-    cmd <- paste0( "ml bcftools; tabix ", gwas, coord ) 
+    cmd <- paste( "ml bcftools; tabix -h ", gwas_path, coord ) 
     
-    if( verbose == TRUE){
-        print(cmd)
-    }
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
-    #result <- read.table(text = system2(command = "tabix",args = cmd, stdout = TRUE, timeout = 1), sep = "\t", header = FALSE)
     message(" * GWAS extracted!")
-    #result <- read.table(text = system(cmd, intern = TRUE), sep = "\t", header=FALSE)
-    result$type <- GWAStype
     
-    names(result)[chrCol] <- "chr"
-    names(result)[posCol] <- "pos"
-    names(result)[pvalCol] <- "pvalues"
-    names(result)[betaCol] <- "beta"
-    names(result)[seCol] <- "varbeta"
+    # get column dictionary
+    cmd <- paste( "zless ", gwas_path, " | head -1 " )
+    columns <- colnames(data.table::fread( cmd = cmd ))
+    col_dict <- setNames(1:length(columns), columns)
+
+    names(result)[names(col_dict) == chrCol]  <- "chr"
+    names(result)[names(col_dict) == posCol]  <- "pos"
+    names(result)[names(col_dict) == pvalCol]  <- "pvalues"
+    names(result)[names(col_dict) == betaCol]  <- "beta"
+    names(result)[names(col_dict) == seCol]  <- "varbeta"
+    # deal with MAF if missing
+    if( !is.na(mafCol) ){
+        message(" * MAF not present - using UK Biobank MAF")
+        result <- matchMAF(result, chr)
+    }else{
+    mafCol <- gwas$full_maf
+    names(result)[names(col_dict) == mafCol] <- "MAF" 
+    }
     # convert standard error to the variance
     result$varbeta <- result$varbeta^2
-    names(result)[mafCol] <- "MAF"
 
     result$snp <-  paste0(result$chr, ":", result$pos)
     result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF)
     
     result <- as.list(result)
     
-    result$N <- N
-    result$type <- GWAStype
+    result$N <- gwas$N
+    result$type <- gwas$type
     
-    if( GWAStype == "cc" ){
-        result$s <- caseProp
+    if( gwas$type == "cc" ){
+        result$s <- gwas$prop_cases
     }
     return(result)
 }
