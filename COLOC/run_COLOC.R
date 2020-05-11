@@ -52,6 +52,61 @@ parseCoords <- function(coords){
     return(split)
 }
 
+pullGWAS <- function(dataset){
+    message(Sys.time()," * selected dataset: ", dataset)
+    db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+
+    message(Sys.time()," * reading GWAS database from ", db_path)
+    stopifnot( file.exists(db_path) )
+
+    gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = 2,na= c("", "-","NA")))
+
+    stopifnot( dataset %in% gwas_db$dataset )
+
+    gwas <- gwas_db[ gwas_db$dataset == dataset & !is.na(gwas_db$dataset), ]
+    stopifnot( nrow(gwas) == 1 )
+
+    stopifnot( all( c("full_path", "full_chrom", "full_pos") %in% names(gwas) ) )
+
+    stopifnot( file.exists(gwas$full_path) )
+
+    return(gwas)
+}
+
+extractLoci <- function(gwas){
+    loci_path <- gwas$top_path
+    # loci are stored either in comma-separated (csv), tab-separated files (txt, tsv) or in excel files (xlsx, xlsm)
+    loci_file <- unlist(stringr::str_split(basename(loci_path), "\\."))
+    loci_ext <- loci_file[ length(loci_file) ]
+    stopifnot( loci_ext %in% c("csv", "txt", "tsv", "xlsx", "xlsm" ) )
+    # read in loci file depending on file type
+    if( loci_ext == "csv" ){
+        loci_df <- readr::read_csv(loci_path)
+    }
+    if( loci_ext %in% c("txt", "tsv") ){
+        loci_df <- readr::read_tsv(loci_path)
+    }
+    if( loci_ext %in% c("xlsx", "xlsm") ){
+        stopifnot( !is.na(gwas$top_sheet) )
+        loci_df <- readxl::read_excel(loci_path, sheet = gwas$top_sheet )
+    }
+    #return(loci_df)
+    # rename columns
+    # return only core set of columns - locus, SNP, chrom, position 
+    stopifnot( all(!is.na(c(gwas$top_locus, gwas$top_snp, gwas$top_chrom, gwas$top_pos) ) ) )
+    loci_df$locus <- loci_df[[gwas$top_locus]] 
+    loci_df$snp <- loci_df[[gwas$top_snp]]
+    loci_df$chr <- loci_df[[gwas$top_chrom]]
+    loci_df$pos <- loci_df[[gwas$top_pos]]
+    
+    loci_clean <- dplyr::select(loci_df, locus, snp, chr, pos)
+    # if P-value present then include it
+    if( !is.na(gwas$top_p) ){
+        loci_clean$p <- loci_df[[gwas$top_p]]
+    }
+    # same for beta and MAF?
+    return(loci_clean)
+}
 
 # extract SNPs within coordinate range from a GWAS summary stat file
 # account for different GWAS having different column naming and ordering with a GWAS_config.yaml file
@@ -118,7 +173,7 @@ liftOverGWAS <- function(gwas, chainPath = "/sc/hydra/projects/ad-omics/data/ref
     # lift over using rtracklayer
     # watch out for duplicate entries
     lifted_over <- rtracklayer::liftOver(gwas_gr, chainPath)
-    stopifnot(length(lifted_over == length(gwas_gr) )
+    stopifnot(length(lifted_over == length(gwas_gr) ) )
     gwas$chr <- seqnames(lifted_over)
     gwas$pos <- start(lifted_over)
 
@@ -258,9 +313,9 @@ gwas_prefix <- opt$gwas_prefix
 #hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
 #outFile <- "test_coloc_results.tsv"
 
-options(echo = TRUE)
+#options(echo = TRUE)
 
-
+main <- function(){
 hits <- read_tsv(hits_file)
 hit_coords <- makeCoords(hits, flank = 0)
 # for testing
@@ -275,3 +330,4 @@ all_res <- purrr::map_df(1:length(hit_coords), ~{
 
 
 readr::write_tsv(all_res, path = outFile)
+}

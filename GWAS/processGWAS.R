@@ -11,55 +11,32 @@
 ## WARNING: this script does not lift over coordinates or flip alleles. You should have done this already.
 
 library(data.table)
+setDTthreads(0) # set number of threads to number provided
 library(readr)
 library(dplyr)
 library(optparse)
 
-#option_list <- list(
-#    make_option(c('-i', '--inFile'), help = "the full GWAS summary stats"),
-#    make_option(c('-o', '--outFile'), help='the path to the output file - without file type suffix', default = ""),
-#    make_option(c('--chrCol'), help = "the column number that stores the chromosome of the variant", default = 3),
-#    make_option(c('--posCol'), help = "the column number that stores the genomic position of the variant", default = 4),
-#    make_option(c('--noChrPrefix'), help = "don't prepend chr to the chromosome column values", action="store_true", default=FALSE) 
-#)
-
 # REFACTORED TO EXCLUSIVELY USE THE RAJ LAB GWAS DATABASE
 
-option_list <- list(
-    make_option(c('--dataset' ), help='the name of the dataset. This must match the value in the database', default = "")
-)
-
-
-option.parser <- OptionParser(option_list=option_list)
-opt <- parse_args(option.parser)
-
-dataset <- opt$dataset
-
-
-
 pullGWAS <- function(dataset){
-
+    message(Sys.time()," * selected dataset: ", dataset)
     db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+    
+    message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
 
-    gwas_db <- readxl::read_excel(db_path, sheet = 2)
+    gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = 2))
 
     stopifnot( dataset %in% gwas_db$dataset )
-
+    
     gwas <- gwas_db[ gwas_db$dataset == dataset & !is.na(gwas_db$dataset), ]
     stopifnot( nrow(gwas) == 1 )
     
     stopifnot( all( c("full_path", "full_chrom", "full_pos") %in% names(gwas) ) )
-    stopifnot( all( !is.na( c(gwas$full_path, gwas$full_chrom, gwas$full_pos ) ) ) )
-    
-    full_chrom <- gwas$full_chrom
-    full_pos <- gwas$full_pos
-    full_path <- gwas$full_path
 
-    stopifnot( file.exists(full_path) )
+    stopifnot( file.exists(gwas$full_path) )
     
-    out <- list(full_chrom = full_chrom, full_pos = full_pos, full_path = full_path)
-    return(out) 
+    return(gwas) 
 }
 
 # read in header of summary stat file
@@ -73,81 +50,86 @@ columnDictionary <- function(file_path){
   return(colDict)
 }
 
-print(" * GWS summary stat processor ")
+# read in summary stats
+# if "chr" present in col_chr then remove it
+# feature for later: if no chr or pos column present then match on RS ID
+# sort by chr and position
+# write out sorted file to reference folder
+# tabix index the file
+sortGWAS <- function(gwas, out_folder = "./"){
+    dataset <- gwas$dataset
+    
+    col_chr <- gwas$full_chrom
+    col_pos <- gwas$full_pos    
+    message(Sys.time()," * reading in GWAS file")
+    gwas_df <- data.table::fread(gwas$full_path, nThread = 4)
 
-if( noChrPrefix == TRUE){
-print(" * no adding chr string to chromosomes")
-}else{
-print(" * prepending \"chr\" to chromosome names")
+    # sample chr column - if "chr" present then remove
+    gwas_df[[col_chr]] <- gsub("chr", "", gwas_df[[col_chr]] )
+
+    gwas_df[[col_chr]] <- as.numeric(gwas_df[[col_chr]] )
+    gwas_df[[col_pos]] <- as.numeric(gwas_df[[col_pos]] )
+    # sort GWAS by chr and pos
+    message(Sys.time()," * sorting GWAS")
+    gwas_sorted <- gwas_df[order(get(col_chr), get(col_pos) )] # get() makes R evaluate the column name as a variable not a string, to allow sorting
+
+    out_path <- paste0(out_folder, dataset, ".processed.tsv")
+    message(Sys.time()," * writing sorted GWAS file to ", out_path)
+    readr::write_tsv(gwas_sorted, out_path)
+    stopifnot(file.exists(out_path) )
 }
 
-print(" * reading in file")
+tabixGWAS <- function(gwas, outFolder = "./"){
+    dataset <- gwas$dataset
 
-gwas <- pullGWAS(dataset)
+    out_path <- paste0(outFolder, dataset, ".processed.tsv")
+    stopifnot(file.exists(out_path) )
+     
+    col_chr <- gwas$full_chrom
+    col_pos <- gwas$full_pos
 
-col_dict <- columnDictionary(gwas$full_path)
+    col_dict <- columnDictionary(gwas$full_path)
 
-#gwas_df <- data.table(fread(gwass$full_path, threads = 4))
-
-col_chr <- gwas$full_chrom
-col_pos <- gwas$full_pos
-
-# get column numbers
-n_chr <- which(names(col_dict) == col_chr )
-n_pos <- which(names(col_dict) == col_pos )
-
-# chr prefix - insist on it?
-
-if( noChrPrefix == FALSE ){
-gwas_df[[col_chr]] <- paste0("chr", gwas_df[[col_chr]] )
-}
-
-names(gwas_df)[num_chr] <- "chr"
-names(gwas_df)[num_pos] <- "pos"
-
-setkey(gwas_df, "chr")
-# get unique values of chromosome column
-all_chrs <- unique( gwas_df[,chr] ) 
-
-# CHR NAME ISSUE
-
-sortFile <- function(gwas, col_dict){
-    n_chr <- which(names(col_dict) == gwas$full_chrom )
-    n_pos <- which(names(col_dict) == gwas$full_pos )
-}
-
-
-tabixFile <- function(gwas, col_dict){
-    n_chr <- which(names(col_dict) == gwas$full_chrom )
-    n_pos <- which(names(col_dict) == gwas$full_pos )
+    # get column numbers
+    n_chr <- which(names(col_dict) == col_chr )
+    n_pos <- which(names(col_dict) == col_pos )
     
-    
-}
-
-
-for(i in all_chrs){
-    print(paste0(" * processing ", i ))
-    chr_df <- gwas_df[i]
-    # sort by position
-    chr_df_sorted <- chr_df[order(pos)]
-    
-    # remove duplicate entries - seem to exist in EBI GWAS
-    chr_df_final <- chr_df_sorted %>% as.data.frame() %>% distinct()
-    
-    # write out file
-    out_path <- paste0(outFile, "_", i, ".tsv")
-
-    write_tsv( chr_df_final, path = out_path)
-    
-    # bgzip file
-    system( paste("ml bcftools; bgzip ", out_path) )
+    # bgzip
+    message(Sys.time()," * bgzipping GWAS" )
+    system( paste("ml bcftools; bgzip -f ", out_path) )
 
     out_path_gzip <- paste0(out_path, ".gz")
     stopifnot(file.exists(out_path_gzip) )
 
     # tabix file
-    tabix_cmd <- paste0("ml bcftools; tabix -f -S 1 -s ", num_chr, " -b ", num_pos, " -e ", num_pos, " ", out_path_gzip) 
+    message(Sys.time()," * tabixing GWAS" )
+    tabix_cmd <- paste0("ml bcftools; tabix -f -S 1 -s ", n_chr, " -b ", n_pos, " -e ", n_pos, " ", out_path_gzip)
     system(tabix_cmd)
     out_path_tabix <- paste0(out_path_gzip, ".tbi")
     stopifnot( file.exists( out_path_tabix) )
+    message(Sys.time()," * processing complete!" )
 }
+
+
+option_list <- list(
+    make_option(c('-n', '--dataset' ), help='the name of the dataset. This must match the value in the database', default = "Marioni_test"),
+    make_option(c('-o', '--out_folder'), help = "the full path to where the processed GWAS should be written to", default = "/sc/hydra/projects/ad-omics/data/references/GWAS/")
+)
+
+
+option.parser <- OptionParser(option_list=option_list)
+opt <- parse_args(option.parser)
+
+dataset <- opt$dataset
+out_folder <- opt$out_folder
+
+
+message(Sys.time()," * GWAS summary stat processor ")
+
+gwas <- pullGWAS(dataset)
+
+sortGWAS(gwas, out_folder)
+tabixGWAS(gwas, out_folder)
+
+
+
