@@ -109,18 +109,58 @@ extractLoci <- function(gwas){
     return(loci_clean)
 }
 
+# load in MAF data from 1000 Genomes
+# already filtered from ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/supporting/EUR.2of4intersection_allele_freq.20100804.sites.vcf.gz
+# all sites with an RSID and 2+ alleles 
+loadMAF <- function(path){
+    message(" * loading in MAF from 1000 Genomes")
+    maf <- data.table::fread(path, nThread = 4)
+    names(maf) <- c("chr", "pos", "snp", "MAF")
+    maf$chr <- as.character(maf$chr)
+    data.table::setkey(maf, "chr")
+    maf$MAF <- suppressWarnings(as.numeric(maf$MAF))
+    return(maf)
+}
 
-# if MAF isn't present in summary stats then use the UK BB MAF
-matchMAF <- function(result, chr, refFolder =  "/sc/hydra/projects/ad-omics/data/references/GWAS/UKBB_MAF/"){
-    maf_file <- paste0(refFolder, "ukb_mfi_chr", chr, "_v3.txt.gz")
-    stopifnot(file.exists(maf_file) )
-    maf <- data.table::fread(maf_file, nThread = 4,
-                           select = c(3,6),
-                           col.names = c("pos","MAF"))
-    maf <- subset(maf, pos %in% result$pos)
-    merged_DT <- data.table:::merge.data.table(result, maf,
-                                             by = "pos")
-    return(merged_DT)
+# use 1000 Genomes MAF estimates if not present in GWAS
+# match on RS ID
+matchMAF <- function(data, maf){
+    stopifnot( "snp" %in% names(data) )
+    stopifnot( all(!is.na(data$snp) ))
+    chr <- gsub("chr", "", unique(data$chr))
+    stopifnot( !is.na(chr) )
+    stopifnot( length(chr) == 1)
+    # subset maf by chromosome
+    maf <- maf[chr] 
+    # match on RSID
+    message(" before joining MAF: ", nrow(data), " SNPs")
+    data$MAF <- maf$MAF[match(data$snp, maf$snp)]
+    data <- data[ !is.na(data$MAF) ,]
+    message(" after joining MAF ", nrow(data), " SNPs")
+    return(data)
+}
+
+# instead of lifting over - very fiddly
+# match the RSID to each SNP in a set of SNPs
+matchRSID <- function(data, build){
+    stopifnot( build %in% c("hg19","hg38") )
+    chr <- as.character(gsub("chr", "", unique(data$chr)))
+    stopifnot( !is.na(chr) )
+    stopifnot( length(chr) == 1)
+    # dbpsnp_hg19 and dbsnp_hg38 are data.table objects indexed by chr
+    if(build == "hg19"){
+        dbsnp <- as.data.frame(dbsnp_hg19[ chr ])
+    }
+    if(build == "hg38"){
+        dbsnp <- as.data.frame(dbpsnp_hg38[chr ])
+    }
+    message(" before joining RSID: ", nrow(data), "SNPs")
+    # here any SNP in data that has no RSID is removed
+    data$snp <- dbsnp$snp[ match(data$pos, dbsnp$pos)]
+    data <- data[ !is.na(data$snp), ]
+    message(" after joining RSID: ", nrow(data), "SNPs")
+    
+    return(data)
 }
 
 # extract SNPs within coordinate range from a GWAS summary stat file
@@ -133,13 +173,14 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     if( !file.exists(gwas_path) ){
         stop("ERROR - processed GWAS not found, make sure you ran process_GWAS.R first")
     }
-    stopifnot( all(!is.na(c(gwas$full_chrom, gwas$full_pos, gwas$full_p, gwas$full_effect, gwas$full_se) ) ))
+    stopifnot( all(!is.na(c(gwas$full_chrom, gwas$full_pos, gwas$full_p, gwas$full_effect, gwas$full_se, gwas$full_snp) ) ))
     chrCol <- gwas$full_chrom
     posCol <- gwas$full_pos
     pvalCol <- gwas$full_p
     betaCol <- gwas$full_effect
     seCol <- gwas$full_se
-    
+    snpCol <- gwas$full_snp
+    mafCol <- gwas$full_maf
     # assume coord is a string following chr:start-end format
     chr <- parseCoords(coord)["chr"]
     
@@ -158,18 +199,20 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     names(result)[names(col_dict) == pvalCol]  <- "pvalues"
     names(result)[names(col_dict) == betaCol]  <- "beta"
     names(result)[names(col_dict) == seCol]  <- "varbeta"
+    names(result)[names(col_dict) == snpCol] <- "snp" 
+    #return(result)
+    
     # deal with MAF if missing
     if( !is.na(mafCol) ){
-        message(" * MAF not present - using UK Biobank MAF")
-        result <- matchMAF(result, chr)
+        message(" * MAF not present - using 1000 Genomes MAF")
+        result <- matchMAF(result, maf_1000g)
     }else{
-    mafCol <- gwas$full_maf
     names(result)[names(col_dict) == mafCol] <- "MAF" 
     }
+
     # convert standard error to the variance
     result$varbeta <- result$varbeta^2
-
-    result$snp <-  paste0(result$chr, ":", result$pos)
+    
     result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF)
     
     result <- as.list(result)
@@ -204,16 +247,12 @@ liftOverGWAS <- function(gwas, chainPath = "/sc/hydra/projects/ad-omics/data/ref
     return(lifted_over)
 }
 
-# extract all nominal QTL P-values overlapping the flanked GWAS hit
-# split by Gene being tested
-# Nominal QTL associations are stored in parquet files, one for each chromosome
-# random access isn't possible (yet) so you have to read in the entire file and subset out the region of interest
-extractQTL <- function(coord, qtl = qtl_prefix, varCol = 2, geneCol = 1, pvalCol = 7, betaCol = 8, seCol = 9, mafCol =4, N = 100, sig_level = 0.05 ){
+extractQTL_parquet <- function(qtl_path, coord){
     coord_split <- parseCoords(coord)
     stopifnot(nrow(coord_split) == 1)
     chr <- unlist(coord_split["chr"])
-
-    perm_file <- paste0(qtl, ".cis_qtl.txt.gz" )
+    
+    perm_file <- paste0(qtl_path, ".cis_qtl.txt.gz" )
     stopifnot(file.exists(perm_file) )
     
     # Read in permutation results
@@ -234,11 +273,45 @@ extractQTL <- function(coord, qtl = qtl_prefix, varCol = 2, geneCol = 1, pvalCol
     names(pq)[geneCol] <- "gene"
     
     pq <- dplyr::filter(pq, gene %in% sig$phenotype_id)
-         
+ 
+
+}
+
+# extract all nominal QTL P-values overlapping the flanked GWAS hit
+# split by Gene being tested
+# Nominal QTL associations are stored in parquet files, one for each chromosome
+# random access isn't possible (yet) so you have to read in the entire file and subset out the region of interest
+extractQTL <- function(qtl, coord, sig_level = 0.05){
+    # variables stored in qtl
+    # if qtl type is parquet then read in parquet files
+    # if qtl type is tabix then query the coordinates through tabix 
+    
+
+    # check columns
+    stopifnot( all(!is.na(c(qtl$full_chrom, qtl$full_pos, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$full_snp) ) ))
+    chrCol <- qtl$full_chrom
+    posCol <- qtl$full_pos
+    pvalCol <- qtl$full_p
+    betaCol <- qtl$full_effect
+    seCol <- qtl$full_se
+    snpCol <- qtl$full_snp
+    mafCol <- qtl$full_maf
+   
+    # read in subset of QTLs 
+    if( qtl$type == "parquet" ){
+        result <- extractQTL_parquet(qtl, coord, sig_level)
+    }
+    if( qtl$type == "tabix" ){
+        result <- extractQTL_tabix(qtl, coord, sig_level)
+    }
+    
+    # assign column names
+                 
     variant_pos <- pq[[varCol]]
     pq$chr <- chr
     pq$pos <- unlist(parseCoords( variant_pos )["start"])
     pq$snp <- paste0(chr,':', pq$pos)
+    
     names(pq)[pvalCol] <- "pvalues"
     names(pq)[betaCol] <- "beta"
     names(pq)[seCol] <- "varbeta"
@@ -340,6 +413,19 @@ gwas_prefix <- opt$gwas_prefix
 #options(echo = TRUE)
 
 main <- function(){
+
+
+maf_1000g <- loadMAF("/sc/hydra/projects/ad-omics/data/references/1000G/1000G_EUR_MAF.bed.gz")
+
+dbsnp_hg19_path <- "/sc/hydra/projects/ad-omics/data/references/hg19_reference/dbSNP/hg19_common_snps_dbSNP_153.bed.gz"
+dbsnp_hg38_path <- "/sc/hydra/projects/ad-omics/data/references/hg38_reference/dbSNP/hg38_common_snps_dbSNP_153.bed.gz"
+
+dbsnp_hg19 <- loadDBSNP(dbsnp_hg19_path)
+dbsnp_hg38 <- loadDBSNP(dbsnp_hg38_path)
+
+
+
+
 hits <- read_tsv(hits_file)
 hit_coords <- makeCoords(hits, flank = 0)
 # for testing
