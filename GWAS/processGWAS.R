@@ -50,6 +50,24 @@ columnDictionary <- function(file_path){
   return(colDict)
 }
 
+
+# if GWAS summary stats are lacking coordinates
+# match them on using dbSNP
+matchRSID <- function(data, col_snp, build = "hg19"){
+    message(" * reading in dbSNP")
+    if(build == "hg19"){
+        dbsnp <- data.table::fread("/sc/hydra/projects/ad-omics/data/references/hg19_reference/dbSNP/hg19_common_snps_dbSNP_153.bed.gz", nThread = 4, header = FALSE)
+        colnames(dbsnp) <- c("chr", "start", "end", "snp")
+    }
+    data$chr <- dbsnp$chr[ match(data[[col_snp]], dbsnp$snp)]
+    data$pos <- dbsnp$end[ match(data[[col_snp]], dbsnp$snp)]
+    message(" * coordinates matched!")
+    message(" * before matching: ", nrow(data), " snps")
+    data <- data[!is.na(data$chr),]
+    message(" * after matching: ", nrow(data), " snps")
+    return(data)
+}
+
 # read in summary stats
 # if "chr" present in col_chr then remove it
 # feature for later: if no chr or pos column present then match on RS ID
@@ -63,7 +81,13 @@ sortGWAS <- function(gwas, out_folder = "./"){
     col_pos <- gwas$full_pos    
     message(Sys.time()," * reading in GWAS file")
     gwas_df <- data.table::fread(gwas$full_path, nThread = 4)
-
+    
+    # if no chr or pos column then match in using dbSNP
+    if( !all( c(col_chr, col_pos) %in% colnames(gwas_df) ) ){
+        message(" * coordinate columns missing! add in with dbsnp" )
+        gwas_df <- matchRSID(gwas_df, gwas$full_snp, "hg19")
+    }
+    
     # sample chr column - if "chr" present then remove
     gwas_df[[col_chr]] <- gsub("chr", "", gwas_df[[col_chr]] )
 
@@ -88,7 +112,7 @@ tabixGWAS <- function(gwas, outFolder = "./"){
     col_chr <- gwas$full_chrom
     col_pos <- gwas$full_pos
 
-    col_dict <- columnDictionary(gwas$full_path)
+    col_dict <- columnDictionary(paste0(out_folder, dataset, ".processed.tsv") )
 
     # get column numbers
     n_chr <- which(names(col_dict) == col_chr )
@@ -104,6 +128,7 @@ tabixGWAS <- function(gwas, outFolder = "./"){
     # tabix file
     message(Sys.time()," * tabixing GWAS" )
     tabix_cmd <- paste0("ml bcftools; tabix -f -S 1 -s ", n_chr, " -b ", n_pos, " -e ", n_pos, " ", out_path_gzip)
+    message(tabix_cmd)
     system(tabix_cmd)
     out_path_tabix <- paste0(out_path_gzip, ".tbi")
     stopifnot( file.exists( out_path_tabix) )

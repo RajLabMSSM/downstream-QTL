@@ -1,0 +1,22 @@
+
+gwas_data = config["gwas"]
+qtl_data = config["qtl"]
+
+outFolder = "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
+
+rule all:
+    input:
+        expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
+
+
+rule run_COLOC:
+    output:
+        outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv"
+    params:
+        script = "run_COLOC.R"
+    shell:
+        "mkdir -p {outFolder}{wildcards.GWAS};"
+        "ml R/3.6.0; ml arrow;"
+        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -o {outFolder}{wildcards.GWAS}/ "
+
+
