@@ -9,7 +9,7 @@ gwas:
     - Marioni_2018
     - Jansen_2018
     - Kunkle_2019
-    - Nicolas_2018_hg19
+    #- Nicolas_2018_hg19
     - Nicolas_2018_hg38
 
 qtl:
@@ -18,3 +18,4 @@ qtl:
     - Microglia_MFG
     - Microglia_STG
     - Microglia_all_regions_Young
+    - Monocytes_MyND

@@ -109,7 +109,10 @@ extractLoci <- function(gwas){
     loci_df$snp <- loci_df[[gwas$top_snp]]
     loci_df$chr <- loci_df[[gwas$top_chrom]]
     loci_df$pos <- as.numeric(loci_df[[gwas$top_pos]])
-     
+    
+    # Ripke has 23 (chrX) in loci - remove 
+    loci_df <- dplyr::filter(loci_df, chr %in% c(1:22) | chr %in% paste0("chr", 1:22) ) 
+ 
     loci_clean <- dplyr::select(loci_df, locus, snp, chr, pos)
     # if P-value present then include it
     if( !is.na(gwas$top_p) ){
@@ -352,7 +355,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05){
     cmd <- paste( "zless ", qtl$full_path, " | head -1 " )
     columns <- colnames(data.table::fread( cmd = cmd ))
     col_dict <- setNames(1:length(columns), columns)
-
+    stopifnot( ncol(result) == length(col_dict) )
     names(result)[names(col_dict) == phenoCol] <- "gene"
     names(result)[names(col_dict) == mafCol]   <- "MAF"
     names(result)[names(col_dict) == pvalCol]  <- "pvalues"
@@ -460,7 +463,8 @@ runCOLOC <- function(gwas, qtl, hit){
 option_list <- list(
         make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
         make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database" ),
-        make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database")
+        make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database"),
+        make_option(c('--debug'), help = "load all files and the nsave RData without running COLOC", action = "store_true", default = FALSE)
 )
 
 option.parser <- OptionParser(option_list=option_list)
@@ -470,7 +474,7 @@ opt <- parse_args(option.parser)
 outFolder <- opt$outFolder
 gwas_dataset <- opt$gwas
 qtl_dataset <- opt$qtl
-
+debug <- opt$debug
 #gwas_prefix <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
 #qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30"
 #qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_splicing/peer20/LumbarSpinalCord_splicing_peer20"
@@ -512,7 +516,8 @@ main <- function(){
     
     # for testing
     #top_loci <- top_loci[2,]
-    
+    if( debug == TRUE){ save.image("debug.RData") }
+  
     all_coloc <- purrr::map(
         1:nrow(top_loci), ~{
             res <- runCOLOC(gwas, qtl, hit = top_loci[.x,])
