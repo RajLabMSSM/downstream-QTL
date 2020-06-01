@@ -17,5 +17,8 @@ qtl:
     - Microglia_SVZ
     - Microglia_MFG
     - Microglia_STG
+    - Microglia_all_regions
     - Microglia_all_regions_Young
+    - Monocytes_Fairfax
     - Monocytes_MyND
+    - DLPFC_ROSMAP

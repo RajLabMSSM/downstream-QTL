@@ -319,7 +319,10 @@ extractQTL_tabix <- function(qtl, coord){
     message(" * running command: ", cmd)
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
     # deal with regions of no QTL association
-    stopifnot( nrow(result) > 0 )
+    if( nrow(result) == 0){ 
+        return(NULL) 
+    }
+    #stopifnot( nrow(result) > 0 )
     message(" * QTL extracted!")
     return(result)
 }
@@ -350,7 +353,9 @@ extractQTL <- function(qtl, coord, sig_level = 0.05){
     if( qtl$full_file_type == "tabix" ){
         result <- extractQTL_tabix(qtl, coord)
     }
-    
+    # if no SNPs found in region return NULL value
+    if(is.null(result) ){ return(NULL) }
+        
     # assign column names
     cmd <- paste( "zless ", qtl$full_path, " | head -1 " )
     columns <- colnames(data.table::fread( cmd = cmd ))
@@ -365,6 +370,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05){
     # don't forget to square the standard error to get the variance             
     result$varbeta <- result$varbeta^2
     
+    # remove rows with variance of 0 - this will corrupt COLOC
+    result <- dplyr::filter(result, varbeta != 0) 
 
     # retain only associations within locus coords
     res_subset <- dplyr::select(result, gene, snp, pvalues, beta, varbeta, MAF) #%>%
@@ -422,7 +429,6 @@ runCOLOC <- function(gwas, qtl, hit){
     
     message(" * extracting QTLs")
     q <- extractQTL(qtl, qtl_range)
-
     if( is.null(q) ){ return(NULL) }
     # for each gene extract top QTL SNP    
     qtl_info <- q %>% 
@@ -457,8 +463,40 @@ runCOLOC <- function(gwas, qtl, hit){
     full_res <- full_join(qtl_info, coloc_df, by = "gene")
     full_res <- full_join(hit_info, full_res, by = "locus")
 
+    # add pairwise LD between GWAS and QTL SNP
+    #full_res <- calc_LD(full_res)
+
     return(list(full_res = full_res, coloc_object = coloc_res) ) 
 }
+
+# for each COLOC result per locus
+# calculate pairwise LD between GWAS SNP and QTL top SNPs
+calc_LD <- function( coloc_res ){
+    require(LDlinkR)
+    # get LDlink token from .Renviron (only Jack has this, for access go to https://ldlink.nci.nih.gov/?tab=apiaccess)
+    token <- Sys.getenv("LDLINK_TOKEN")
+    if( token == ""){ 
+        warning(" * LDlink token not found!" )
+        return(NA)
+    }
+    snps <- unique( c( unique(coloc_res$GWAS_SNP), unique( coloc_res$QTL_SNP) ) )
+    
+    # remove NA values
+    snps <- snps[!is.na(snps)]
+    
+    # get pairwise LD matrix
+    ld_matrix <-  LDmatrix( snps, pop = "CEU", r2d = "r2", token = Sys.getenv("LDLINK_TOKEN") )
+    
+    #stopifnot( nrow(ld_matrix) < length(snps) )
+
+    ld_matrix <- tibble::column_to_rownames(ld_matrix, var = "RS_number")
+    
+    coloc_res$LD_CEU_R2 <- ld_matrix[ coloc_res$QTL_SNP, coloc_res$GWAS_SNP][,1]
+    # wait 5 seconds before returning - makes sure API queries are spread out
+    #Sys.sleep(time = 5)
+    return(coloc_res) 
+}
+
 
 option_list <- list(
         make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
