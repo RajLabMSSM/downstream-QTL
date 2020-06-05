@@ -5,13 +5,16 @@ library(LDlinkR)
 
 inFolder <- "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
 
+H4_threshold <- 0
+calculate_LD <- FALSE
+
 all_files <- list.files(inFolder, pattern = "COLOC.tsv", recursive = TRUE, full.names = TRUE )
 
 names(all_files) <- all_files
 
 all_res <- purrr::map_df(all_files, ~{
     read_tsv(.x) %>% 
-    filter( PP.H4.abf > 0.5 ) %>% 
+    filter( PP.H4.abf >= H4_threshold ) %>% 
     mutate(locus = as.character(locus)) 
 }, .id = "file")
 
@@ -98,9 +101,11 @@ calc_LD <- function( x ){
     return(x)
 }
 
-all_snps_ld <- map_df(all_snps, calc_LD )
+if( calculate_LD == TRUE){
+    all_snps_ld <- map_df(all_snps, calc_LD )
 
-all_res <- left_join(all_res, all_snps_ld, by = c("GWAS_SNP", "QTL_SNP") )
+    all_res <- left_join(all_res, all_snps_ld, by = c("GWAS_SNP", "QTL_SNP") )
+}
 
 # write out
-write_tsv(all_res, paste0(inFolder, path = "all_COLOC_results_merged_H4_0.5.tsv") )
+write_tsv(all_res, paste0(inFolder, "all_COLOC_results_merged_H4_", H4_threshold, ".tsv") )
