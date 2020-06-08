@@ -21,33 +21,18 @@ Run qvalue on the target P-value column to get Pi1. Take 1 - Pi1 to get Pi0.
 
 ## Running
 
-currently just uses tensorQTL outputs - I will expand to use other sources of summary stat
+This interfaces with the [Raj Lab GWAS/QTL database](https://docs.google.com/spreadsheets/d/1BgLQaRZd9L7JoO8IbpzhUCRFdTdLgJvD/edit#gid=473131646) - this is where we keep a standard set of metadata for all GWAS and QTL summary stats that we have access to.
 
-This assumes that permutation results are kept in a .cis_qtl.txt.gz file, and the nominal p values are kept in parquet files, one per chromosome.
+The qvalue pi1 can be calculated between any two QTL summary statistics available, with the caveat that only QTL datasets that have permutation results can be used as the "source" set.
 
---source refers to the permutation p-values
-
---target refers to the nominal p-values
+For full list of datasets, check [here](https://docs.google.com/spreadsheets/d/1BgLQaRZd9L7JoO8IbpzhUCRFdTdLgJvD/edit#gid=473131646)
 
 ```
-# example using NYGC ALS QTLs
-qtl=/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/
+Rscript run_qvalue --source <name of source dataset> --target <name of target dataset> --outFolder <path to store results>
+```
 
-# first prepare data
-python prepare_qvalue_sharing.py --source $qtl/FrontalCortex_expression/peer30/FrontalCortex_expression_peer30.cis_qtl.txt.gz --target $qtl/Cerebellum_expression/peer30/ -o test.tsv
-
-# then run qvalue on output file
-Rscript run_qvalue.R --inFile test.tsv --outFile qvalue_res.txt --sourceName FrontalCortex --targetName Cerebellum
+Merging multiple results can be done with 
 
 ```
-qvalue.res.txt is a single row dataFrame containing the values "source", "target" and "pi1"
-
-### Computing all pairwise combinations from two lists of files
-
-pairwise_QTL_sharing.R takes two tables, source (permutation Ps) and target (nominal Ps) files. Each file must be a 2 column table with the following 2 columns:
-
-* name (the name of the dataset)
-* path (the path to the either the cis_qtl.txt.gz permutation file, or the path to the directory containing the nominal parquet files)
-
-
-
+merge_qvalue.R --outFolder <path where results are>
+```

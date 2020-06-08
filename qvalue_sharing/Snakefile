@@ -1,0 +1,32 @@
+
+source_data = config["sources"]
+target_data = config["targets"]
+outFolder = config["outFolder"]
+
+rule all:
+    input:
+        expand( outFolder + "{source}:{target}.qvalue.tsv", source = source_data, target = target_data ),
+        outFolder + "all_qvalue_merged.tsv"
+
+
+rule run_qvalue:
+    params:
+        source = "{source}",
+        target = "{target}",
+        script = "run_qvalue.R"
+    output:
+        outFolder + "{source}:{target}.qvalue.tsv"
+    shell:
+        "ml R/3.6.0;"
+        "Rscript {params.script} -s {params.source} -t {params.target} -o {outFolder}"
+
+rule merge_qvalue:
+    input:
+         expand( outFolder + "{source}:{target}.qvalue.tsv", source = source_data, target = target_data )
+    params:
+        script = "merge_qvalue.R"
+    output:
+        outFolder + "all_qvalue_merged.tsv"
+    shell:
+        "ml R/3.6.0;"
+        "Rscript {params.script} -o {outFolder} "

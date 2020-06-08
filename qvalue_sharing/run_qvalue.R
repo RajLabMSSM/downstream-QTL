@@ -176,7 +176,7 @@ main <- function(){
 
 #sourceName <- "Microglia_THA"
 #targetName <- "Microglia_SVZ"
-outFile <- file.path( outFolder, paste0(sourceName, "_", targetName, ".qvalue.tsv") )
+outFile <- file.path( outFolder, paste0(sourceName, ":", targetName, ".qvalue.tsv") )
 
 qtl_source <- pullData(sourceName, type = "QTL")
 qtl_target <- pullData(targetName, type = "QTL")
@@ -199,8 +199,13 @@ qvalue_res <- left_join(source_top_res, target_res, by = c("pheno", "snp") )
 # remove missing values
 qvalue_res <- qvalue_res[ !is.na(qvalue_res$pvalue_target), ]
 
+# write data
+save(qvalue_res, source_top_res, target_res,  file = gsub("tsv", "RData", outFile) )
+
+
+
 # get pi1 of target compared to source
-final_res <- get_pi_1( target_res, sourceName, targetName)
+final_res <- get_pi_1( qvalue_res, sourceName, targetName)
 
 # write table
 message(" * writing to: ", outFile)

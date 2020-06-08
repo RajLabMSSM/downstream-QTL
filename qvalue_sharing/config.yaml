@@ -1,0 +1,13 @@
+sources:
+    - Frontal_Cortex_NYGC
+
+targets:
+    - Cerebellum_NYGC
+    - Cervical_Spinal_Cord_NYGC
+    - DLPFC_ROSMAP
+    - GTEX_Brain_Cerebellum
+    - GTEX_Brain_Cortex
+    - GTEX_Brain_Spinal_cord_cervical_c-1
+
+outFolder:
+    "qvalue_res/"
