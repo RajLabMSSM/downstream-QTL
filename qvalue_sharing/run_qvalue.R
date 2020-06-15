@@ -1,5 +1,7 @@
 
 # Q-value sharing using the GWAS/QTL database
+# requires development version of qvalue
+# remotes::install_github("jdstorey/qvalue")
 
 # get QTL metadata for source (top QTLs) and target (all QTLs) from database
 pullData <- function(dataset, type = "GWAS"){
@@ -28,7 +30,7 @@ pullData <- function(dataset, type = "GWAS"){
     return(gwas)
 }
 # read in top permutation QTL results
-extractTopQTL <- function(qtl, qvalue_threshold = 0.05){
+extractTopQTL <- function(qtl, qvalue_threshold){
     loci_path <- qtl$top_path
     # loci are stored either in comma-separated (csv), tab-separated files (txt, tsv) or in excel files (xlsx, xlsm)
     # read in loci file depending on file type
@@ -117,7 +119,7 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
 run_qvalue <- function(x){
     tryCatch(
         expr = {
-            return(qvalue::qvalue(x) )
+            return(qvalue::qvalue_truncp(x) )
             message("Successfully executed the log(x) call.")
         },
         error = function(e){
@@ -160,7 +162,8 @@ library(optparse)
 option_list <- list(
         make_option(c('-o', '--outFolder'), help='the path to the output folder', default = "."),
         make_option(c('-s', '--sourceName'), help = "the name of the source P-value distribution", default = "source"),
-        make_option(c('-t', '--targetName'), help = 'the name of the target P-value distribution', default = "target")
+        make_option(c('-t', '--targetName'), help = 'the name of the target P-value distribution', default = "target"),
+        make_option(c('-q', '--threshold'), help = 'how to threshold significant associations in source dataset', default = 0.05)
 )
 
 option.parser <- OptionParser(option_list=option_list)
@@ -170,19 +173,19 @@ opt <- parse_args(option.parser)
 outFolder <- opt$outFolder
 sourceName <- opt$sourceName
 targetName <- opt$targetName
-  
+threshold <- opt$threshold  
 
 main <- function(){
 
 #sourceName <- "Microglia_THA"
 #targetName <- "Microglia_SVZ"
-outFile <- file.path( outFolder, paste0(sourceName, ":", targetName, ".qvalue.tsv") )
+outFile <- file.path( outFolder, paste0(sourceName, ":", targetName, ":", threshold, ".qvalue.tsv") )
 
 qtl_source <- pullData(sourceName, type = "QTL")
 qtl_target <- pullData(targetName, type = "QTL")
 
 # get source permutation QTLs (top QTLs)
-source_top_res <- extractTopQTL(qtl_source)
+source_top_res <- extractTopQTL(qtl_source,qvalue_threshold = threshold)
 
 if( qtl_target$full_chr_type == "chr1" ){
     chroms <- paste0("chr", seq(1,22) ) 

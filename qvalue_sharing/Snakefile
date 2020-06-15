@@ -2,11 +2,12 @@
 source_data = config["sources"]
 target_data = config["targets"]
 outFolder = config["outFolder"]
+threshold = str(config["threshold"])
 
 rule all:
     input:
-        expand( outFolder + "{source}:{target}.qvalue.tsv", source = source_data, target = target_data ),
-        outFolder + "all_qvalue_merged.tsv"
+        expand( outFolder + "{source}:{target}:{threshold}.qvalue.tsv", source = source_data, target = target_data, threshold = threshold ),
+        outFolder + "all_qvalue_merged." + threshold + ".tsv"
 
 
 rule run_qvalue:
@@ -15,18 +16,18 @@ rule run_qvalue:
         target = "{target}",
         script = "run_qvalue.R"
     output:
-        outFolder + "{source}:{target}.qvalue.tsv"
+        outFolder + "{source}:{target}:{threshold}.qvalue.tsv"
     shell:
         "ml R/3.6.0;"
-        "Rscript {params.script} -s {params.source} -t {params.target} -o {outFolder}"
+        "Rscript {params.script} -s {params.source} -t {params.target} -q {threshold} -o {outFolder}"
 
 rule merge_qvalue:
     input:
-         expand( outFolder + "{source}:{target}.qvalue.tsv", source = source_data, target = target_data )
+         expand( outFolder + "{source}:{target}:{threshold}.qvalue.tsv", source = source_data, target = target_data, threshold = threshold )
     params:
         script = "merge_qvalue.R"
     output:
-        outFolder + "all_qvalue_merged.tsv"
+        outFolder + "all_qvalue_merged." + threshold + ".tsv"
     shell:
         "ml R/3.6.0;"
-        "Rscript {params.script} -o {outFolder} "
+        "Rscript {params.script} -o {outFolder} -q {threshold}"

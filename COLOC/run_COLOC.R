@@ -22,9 +22,9 @@ library(purrr)
 library(readr)
 library(dplyr)
 library(stringr)
-library(arrow)
 library(coloc)
 library(optparse)
+#library(arrow)
 
 # flank coordinates by set number of bases (default 1MB)
 # work on either a coordinate string or a dataframe containing chr start and end columns
@@ -226,12 +226,12 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     
     result <- as.list(result)
     
-    result$N <- gwas$N
+    result$N <- as.numeric(gwas$N)
     result$type <- gwas$type
     
     if( gwas$type == "cc" ){
         if( !is.na(gwas$prop_cases)){
-        result$s <- gwas$prop_cases
+        result$s <- as.numeric(gwas$prop_cases)
         }else{
             result$s <- 0.5
         }
@@ -382,7 +382,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05){
         split(res_subset, res_subset$gene) %>%
         purrr::map( ~{ 
             x = as.list(.x)
-            x$N <- qtl$N
+            x$N <- as.numeric(qtl$N)
             x$type <- "quant"
             return(x)
         })
@@ -445,7 +445,10 @@ runCOLOC <- function(gwas, qtl, hit){
     coloc_res <- 
         purrr::map( q, ~{
             # if QTL has no overlapping SNPs with GWAS summary then return NULL
-            if( length(intersect(g$snp, .x$snp) ) == 0 ){ return(NULL) }
+            if( length(intersect(g$snp, .x$snp) ) == 0 ){ 
+                warning("GWAS and QTL have no SNPs in common")
+                return(NULL) 
+            }
             coloc_object <- coloc.abf(dataset1 = g, dataset2 = .x)
             # add in g and q to coloc object
             gq <- dplyr::inner_join(as.data.frame(g),as.data.frame(.x), by = "snp", suffix = c(".gwas", ".qtl") )
@@ -566,6 +569,7 @@ main <- function(){
     all_res <- map_df(all_coloc, "full_res")
     all_obj <- map(all_coloc, "coloc_object")    
     names(all_obj) <- top_loci$locus
+    
     
     # arrange by H4
     all_res <- arrange(all_res, desc(PP.H4.abf)  )

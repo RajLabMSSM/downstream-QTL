@@ -2,6 +2,16 @@
 
 Applying the π0 method to assess rates of sharing between two QTL results
 
+Dependencies:
+
+development version of qvalue to deal with truncated p-value distributions - this occurs when datasets are exactly the same or very similar, or you have very few associations to compare.
+
+install like so:
+
+```
+remotes::install_github("jdstorey/qvalue")
+```
+
 Inputs:
 
 * Source QTL dataset

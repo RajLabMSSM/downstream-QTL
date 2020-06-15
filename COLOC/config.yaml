@@ -17,8 +17,15 @@ qtl:
     - Microglia_SVZ
     - Microglia_MFG
     - Microglia_STG
+    - Microglia_sQTL_THA
+    - Microglia_sQTL_SVZ
+    - Microglia_sQTL_MFG
+    - Microglia_sQTL_STG
     - Microglia_all_regions
     - Microglia_all_regions_Young
     - Monocytes_Fairfax
     - Monocytes_MyND
     - DLPFC_ROSMAP
+
+outFolder: "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
+

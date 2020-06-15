@@ -1,8 +1,7 @@
 
 gwas_data = config["gwas"]
 qtl_data = config["qtl"]
-
-outFolder = "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
+outFolder = config["outFolder"]
 
 rule all:
     input:
