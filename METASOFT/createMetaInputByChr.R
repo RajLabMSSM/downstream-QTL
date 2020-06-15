@@ -128,14 +128,14 @@ prefix <- paste( data_list, collapse = "-" )
 
 outFile_final <- file.path(outFolder, paste0( prefix, ".metasoft.tsv" ) )
 
-chr_nums <- 1
+chr_nums <- 1:22
 
 chrs <- paste0("chr", chr_nums)
 
 # iterate through chromosomes
 for( chr in chrs){
     message(" * merging data in ", chr )
-    outFile <- file.path( outFolder, paste0(prefix,".metasoft.", chr, ".tsv" ) )
+    outFile <- file.path( outFolder, paste0(prefix,chr, ".metasoft.input.tsv" ) )
     res <- purrr::map( qtl_list, ~{
         extractTargetQTL(.x, chr = chr)
     })  %>% 
@@ -144,26 +144,23 @@ for( chr in chrs){
     data_names <- unlist(purrr::map( seq(length(data_list)), ~{ res <- paste( c("beta","se"), .x, sep = "."); return(res) }))
     names(res) <- c("snp_gene", data_names)
  
-    if( chr == "chr1"){
-        write_tsv( res, path = outFile, col_names = TRUE)
-    }else{
-        write_tsv( res, path = outFile, col_names = TRUE)
-    }
+    write_tsv( res, path = outFile, col_names = FALSE)
     rm(res)
     gc()
 }
 
 
-# use cat to concatenate together 
-message(" * concatenating to ", outFile_final)
 
-all_temp <- file.path( outFolder, paste0(prefix, ".metasoft.chr", chr_nums, ".tsv", collapse = " ") )
-cmd <- paste( "cat", all_temp, " > ", outFile_final)
-message( cmd )
-system(cmd)
+# use cat to concatenate together 
+#message(" * concatenating to ", outFile_final)
+
+#all_temp <- file.path( outFolder, paste0(prefix, ".metasoft.chr", chr_nums, ".tsv", collapse = " ") )
+#cmd <- paste( "cat", all_temp, " > ", outFile_final)
+#message( cmd )
+#system(cmd)
 # remove temp files
-cmd <- paste( "rm ", all_temp)
-system(cmd)
+#cmd <- paste( "rm ", all_temp)
+#system(cmd)
 
 
 

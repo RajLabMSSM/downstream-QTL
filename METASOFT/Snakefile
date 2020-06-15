@@ -1,0 +1,58 @@
+
+# METASOFT pipeline
+
+# config.yaml
+# datasets: 
+# - dataset1
+# - dataset2
+# outFolder: "."
+# dataCode: "test"
+
+datasets = config["datasets"]
+
+dataset_string = "-".join(datasets)
+
+outFolder = config["outFolder"]
+chromosomes = list(range(1,23))
+vcf = ""
+
+rule all:
+    input:
+        dataset_string + ".metasoft.tabixed.tsv.gz.tbi"
+
+rule createInputFiles:
+    output:
+       expand( dataset_string + "chr{chr}.metasoft.input.tsv", chr = chromosomes )
+    params:
+        dataset_args = " ".join(datasets)
+    shell:
+        "ml R/3.6.0;"
+        "Rscript createMetaInputByChr.R -o {outFolder} {params.dataset_args} "
+
+
+rule runMETASOFT:
+    input:  dataset_string + "chr{chr}.metasoft.input.tsv"
+    output: dataset_string + "chr{chr}.metasoft.res.tsv"
+    params:
+        jarfile = "/sc/hydra/projects/ad-omics/data/software/METASOFT/Metasoft.jar",
+        ptable = "/sc/hydra/projects/ad-omics/data/software/METASOFT/HanEskinPvalueTable.txt"
+    shell:
+        "java -jar {params.jarfile} -pvalue_table {params.ptable} -input {input} -mvalue -mvalue_p_thres 1E-4 -output {output} -verbose"
+
+# split phenotype from SNP, add coords from VCF
+rule formatResults:
+    input: dataset_string + "chr{chr}.metasoft.res.tsv",
+    output:  dataset_string + "chr{chr}.metasoft.res.formatted.tsv",
+    shell:
+        "ml R/3.6.0;"
+        "Rscript formatMETASOFT.R -i {input} -o {output} -v {vcf} "
+
+# merge together and tabix
+rule mergeResults:
+    input: expand( dataset_string + "chr{chr}.metasoft.res.formatted.tsv", chr = chromosomes )
+    output: dataset_string + ".metasoft.tabixed.tsv.gz.tbi"
+    shell:
+        "ml R/3.6.0;"
+        "Rscript merge_metasoft.R --outFolder {outFolder} --outFile {output}"    
+
+
