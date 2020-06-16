@@ -2,11 +2,35 @@
 # subset to all results with H4 >0.5
 library(tidyverse)
 library(LDlinkR)
+library(optparse)
+option_list <- list(
+    make_option(c('--inFolder' ), help='The full path to the folder that contains the COLOC results', default = ""),
+    make_option(c('--threshold'), help = "minimum PP.H4.abf value", default = 0),
+    make_option(c('--ld'), help = "whether to match LD or not", action="store_true", default=FALSE)
+)
 
-inFolder <- "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
+option.parser <- OptionParser(option_list=option_list)
+opt <- parse_args(option.parser)
 
-H4_threshold <- 0
-calculate_LD <- FALSE
+calculate_LD <- opt$ld
+inFolder <- opt$inFolder
+H4_threshold <- opt$threshold
+
+if( calculate_LD == TRUE){
+    LD_string <- "_with_LD"
+}else{
+    LD_string <- "_no_LD"
+}
+
+outFile <- paste0(inFolder, "all_COLOC_results_merged_H4_", H4_threshold, LD_string,".tsv")
+
+message(" * writing to ", outFile)
+
+#inFolder <- "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
+#H4_threshold <- 0.5
+#calculate_LD <- TRUE
+#H4_threshold <- 0
+#calculate_LD <- FALSE
 
 all_files <- list.files(inFolder, pattern = "COLOC.tsv", recursive = TRUE, full.names = TRUE )
 
@@ -51,9 +75,38 @@ all_res <- left_join(all_res, gwas_key, by = "GWAS")
 
 all_res <- select(all_res, GWAS, disease, QTL, -file, everything() )
 
+# deal with gene
+# sQTLs include junction too
+all_res$geneid <- map_chr(str_split(all_res$gene, ":"), ~{ .x[ length(.x) ] })
+all_res$geneid <- str_split_fixed(all_res$geneid, "\\.", 2)[,1]
+
+gene_meta <- read_tsv("/sc/hydra/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>% 
+    janitor::clean_names() %>%
+    select(genename, geneid) %>% distinct()
+
+# remove tags
+gene_meta$geneid <- str_split_fixed(gene_meta$geneid, "\\.", 2)[,1]
+
+# match on gene symbols
+all_res$genename <- gene_meta$genename[ match(all_res$geneid, gene_meta$geneid) ]
+
+# coalesce - if no gene symbol found use ID
+all_res$QTL_Gene <- coalesce(all_res$genename, all_res$geneid)
+
+# add geneid back to make sure
+all_res$QTL_Ensembl <- gene_meta$geneid[match(all_res$gene, gene_meta$genename)] 
+
+all_res$type <- ifelse( grepl("sQTL", all_res$QTL), "sQTL", "eQTL" )
+
+
+all_res <- select(all_res, disease, GWAS, locus, starts_with("GWAS"), QTL, type, starts_with("QTL"), nsnps, starts_with("PP") )
+
 # add pairwise LD using LDlink
 # split into chunks by GWAS SNP
 all_snps <- select(all_res, QTL_SNP, GWAS_SNP) %>% distinct() %>% split(.$GWAS_SNP)
+
+
+
 # for each chunk generate LD matrix
 
 calc_LD <- function( x ){
@@ -65,7 +118,10 @@ calc_LD <- function( x ){
         warning(" * LDlink token not found!" )
         return(NA)
     }
-    
+   
+    # weird snps with "esv" instead of "rs" - remove
+    snps <- snps[ grepl("rs", snps) ]
+     
     # if only one SNP then QTL and GWAS must be same SNP
     if( length(snps) == 1){ 
         x$LD <- 1; return(x) 
@@ -108,4 +164,4 @@ if( calculate_LD == TRUE){
 }
 
 # write out
-write_tsv(all_res, paste0(inFolder, "all_COLOC_results_merged_H4_", H4_threshold, ".tsv") )
+write_tsv(all_res, outFile)

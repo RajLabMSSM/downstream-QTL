@@ -139,6 +139,7 @@ loadMAF <- function(path){
 # match on RS ID
 matchMAF <- function(data, maf){
     stopifnot( "snp" %in% names(data) )
+    stopifnot( "chr" %in% names(data) )
     #stopifnot( all(!is.na(data$snp) ))
     chr <- gsub("chr", "", unique(data$chr))
     stopifnot( !is.na(chr) )
@@ -211,11 +212,11 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     
     # deal with MAF if missing
     if( is.na(mafCol) | force_maf == TRUE ){
-        message(" * MAF not present - using 1000 Genomes MAF")
+        message("       * MAF not present - using 1000 Genomes MAF")
         # how to get this in to the function? it can't find maf_1000g
         result <- matchMAF(result, maf = maf_1000g)
     }else{
-        message(" * using supplied MAF")
+        message("       * using supplied MAF")
         names(result)[names(col_dict) == mafCol] <- "MAF" 
     }
 
@@ -316,14 +317,14 @@ extractQTL_tabix <- function(qtl, coord){
     }
     stopifnot( file.exists(qtl$full_path) )
     cmd <- paste( "ml bcftools; tabix -h ", qtl$full_path, coord )
-    message(" * running command: ", cmd)
+    message("       * running command: ", cmd)
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
     # deal with regions of no QTL association
     if( nrow(result) == 0){ 
         return(NULL) 
     }
     #stopifnot( nrow(result) > 0 )
-    message(" * QTL extracted!")
+    message("       * QTL extracted!")
     return(result)
 }
 
@@ -331,14 +332,14 @@ extractQTL_tabix <- function(qtl, coord){
 # extract all nominal QTL P-values overlapping the flanked GWAS hit
 # split by Gene being tested
 # sig_level doesn't do anything yet
-extractQTL <- function(qtl, coord, sig_level = 0.05){
+extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     # variables stored in qtl
     # if qtl type is parquet then read in parquet files
     # if qtl type is tabix then query the coordinates through tabix 
     
 
     # check columns
-    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_beta, qtl$full_se, qtl$full_maf, qtl$N, qtl$build) ) ))
+    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_beta, qtl$full_se, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
     betaCol <- qtl$full_beta
     phenoCol <- qtl$full_pheno
@@ -367,6 +368,20 @@ extractQTL <- function(qtl, coord, sig_level = 0.05){
     names(result)[names(col_dict) == betaCol]  <- "beta"
     names(result)[names(col_dict) == seCol]    <- "varbeta"
     names(result)[names(col_dict) == snpCol]   <- "snp"
+    
+    # deal with MAF - meta-analysis outputs won't have it
+    # this requires "chr" to be present in QTL data
+    if( is.na(mafCol) | force_maf == TRUE ){
+        message("       * MAF not present - using 1000 Genomes MAF")
+        stopifnot( "chr" %in% names(col_dict) )
+        names(result)[names(col_dict) == "chr"] <- "chr"
+        result <- matchMAF(result, maf = maf_1000g)
+    }else{
+        message("       * using supplied MAF")
+        names(result)[names(col_dict) == mafCol] <- "MAF"
+    }
+
+
     # don't forget to square the standard error to get the variance             
     result$varbeta <- result$varbeta^2
     
@@ -402,14 +417,14 @@ extractQTL <- function(qtl, coord, sig_level = 0.05){
 ## COLOC results - this should include the GWAS locus, the gene of interest, the top QTL variant and the top QTL p-value
 ## object - this should be a table combining the two input datasets, inner joined on "snp", to be used for plotting.
 runCOLOC <- function(gwas, qtl, hit){
-    message(" * analysing locus: ", hit$locus )
+    message(" * Analysing LOCUS: ", hit$locus )
     # hit is a dataframe containing "snp", "chr", "pos", "locus"
     
     hit_coord <- joinCoords(hit, flank = 0)
     hit_range <- joinCoords(hit, flank = 1e6)
  
     # extract GWAS and QTL summary for given coord
-    message(" * extracting GWAS")
+    message("       * extracting GWAS")
     g <- extractGWAS(gwas, hit_range)
     
     # get hit info from GWAS
@@ -427,7 +442,7 @@ runCOLOC <- function(gwas, qtl, hit){
     }
     qtl_range <- joinCoords(qtl_coord, flank = 1e6)
     
-    message(" * extracting QTLs")
+    message("       * extracting QTLs")
     q <- extractQTL(qtl, qtl_range)
     if( is.null(q) ){ return(NULL) }
     # for each gene extract top QTL SNP    
@@ -439,7 +454,7 @@ runCOLOC <- function(gwas, qtl, hit){
         }) 
     
     # actually run COLOC
-        message(" * running COLOC")
+        message("      * running COLOC")
     # run COLOC on each QTL gene 
     # return the results table and an object containing g and q
     coloc_res <- 
@@ -457,11 +472,11 @@ runCOLOC <- function(gwas, qtl, hit){
             coloc_df <- as.data.frame(t(coloc_object$summary), stringsAsFactors = FALSE)
             return( list(df = coloc_df, object = coloc_object) )
         })
-    message("COLOC finished")
+    message("       * COLOC finished")
     coloc_df <- map_df(coloc_res, "df", .id = "gene") %>% 
         dplyr::mutate(locus = hit$locus ) %>%
         dplyr::select(locus, gene, everything() )
-    message("COLOC res created")
+    message("       * COLOC res created")
     # bind coloc_res to other tables
     full_res <- full_join(qtl_info, coloc_df, by = "gene")
     full_res <- full_join(hit_info, full_res, by = "locus")

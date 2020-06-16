@@ -6,6 +6,6 @@ datasets:
     - Lateral_Motor_Cortex_NYGC
     - Medial_Motor_Cortex_NYGC
     - Temporal_Cortex_NYGC
-outFolder: ""
+outFolder: "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/METASOFT/"
 dataCode: "all_nygc_eqtl"
 vcf: "test.vcf"

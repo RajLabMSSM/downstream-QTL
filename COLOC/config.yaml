@@ -26,6 +26,7 @@ qtl:
     - Monocytes_Fairfax
     - Monocytes_MyND
     - DLPFC_ROSMAP
-
+    - Microglia_Young
+    - Microglia_all_regions_sQTL
 outFolder: "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
 

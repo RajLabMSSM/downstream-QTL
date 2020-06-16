@@ -13,8 +13,11 @@ datasets = config["datasets"]
 dataset_string = "-".join(datasets)
 
 outFolder = config["outFolder"]
+
+dataset_string = outFolder + dataset_string
+
 chromosomes = list(range(1,23))
-vcf = ""
+vcf = config["vcf"]
 
 rule all:
     input:
@@ -22,37 +25,46 @@ rule all:
 
 rule createInputFiles:
     output:
-       expand( dataset_string + "chr{chr}.metasoft.input.tsv", chr = chromosomes )
+       dataset_string + ".{chr}.metasoft.input.tsv"
     params:
         dataset_args = " ".join(datasets)
     shell:
         "ml R/3.6.0;"
-        "Rscript createMetaInputByChr.R -o {outFolder} {params.dataset_args} "
+        "Rscript createMetaInputByChr.R -c {wildcards.chr} -o {outFolder} {params.dataset_args} "
 
 
 rule runMETASOFT:
-    input:  dataset_string + "chr{chr}.metasoft.input.tsv"
-    output: dataset_string + "chr{chr}.metasoft.res.tsv"
+    input:  dataset_string + ".{chr}.metasoft.input.tsv"
+    output: dataset_string + ".{chr}.metasoft.res.tsv"
     params:
         jarfile = "/sc/hydra/projects/ad-omics/data/software/METASOFT/Metasoft.jar",
         ptable = "/sc/hydra/projects/ad-omics/data/software/METASOFT/HanEskinPvalueTable.txt"
     shell:
-        "java -jar {params.jarfile} -pvalue_table {params.ptable} -input {input} -mvalue -mvalue_p_thres 1E-4 -output {output} -verbose"
+        "ml java; java -jar {params.jarfile} -pvalue_table {params.ptable} -input {input} -mvalue -mvalue_p_thres 1E-4 -output {output} -verbose"
+
+rule processVCF:
+    input: vcf
+    output: outFolder + "vcf.processed.txt"
+    shell:
+        "ml bcftools; bcftools query -f '%CHROM\t%POS\t%ID\n'  {input} > {output} " 
 
 # split phenotype from SNP, add coords from VCF
 rule formatResults:
-    input: dataset_string + "chr{chr}.metasoft.res.tsv",
-    output:  dataset_string + "chr{chr}.metasoft.res.formatted.tsv",
+    input: 
+        res = dataset_string + ".{chr}.metasoft.res.tsv",
+        vcf_df = outFolder + "vcf.processed.txt"
+    output:  dataset_string + ".{chr}.metasoft.res.formatted.tsv",
     shell:
         "ml R/3.6.0;"
-        "Rscript formatMETASOFT.R -i {input} -o {output} -v {vcf} "
+        "Rscript formatMETASOFT.R -c {wildcards.chr} -i {input.res} -o {output} -v {input.vcf_df} "
 
 # merge together and tabix
 rule mergeResults:
-    input: expand( dataset_string + "chr{chr}.metasoft.res.formatted.tsv", chr = chromosomes )
+    input: expand( dataset_string + ".{chr}.metasoft.res.formatted.tsv", chr = chromosomes )
     output: dataset_string + ".metasoft.tabixed.tsv.gz.tbi"
     shell:
-        "ml R/3.6.0;"
-        "Rscript merge_metasoft.R --outFolder {outFolder} --outFile {output}"    
+        "ml bcftools/1.9;"
+        "cat {input} | bgzip > {dataset_string}.metasoft.tabixed.tsv.gz;"
+        "tabix -s 28 -b 29 -e 29 -S 1 {dataset_string}.metasoft.tabixed.tsv.gz"     
 
 

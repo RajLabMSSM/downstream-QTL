@@ -50,9 +50,15 @@ extractTargetQTL <- function(qtl, chr ){
     }
     
     # read in QTL
-    cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr)
+    # use dark awk magic to remove the clusterID while reading in
+    if( qtl$phenotype == "sQTL" ){
+        cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr, ' | awk \'{gsub(/clu_[0-9]+_[+-]:/, ""); print }\' ')
+    }else{
+        cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr)
+    }
     message( " * ", cmd)
-    result <- data.table::fread( cmd = cmd, nThread = 8 )
+    result <- data.table::fread( cmd = cmd, nThread = 8 , fill = TRUE)
+    message( " * QTL read in!" )
     if( nrow(result) == 0){
         return(NULL)
     }
@@ -100,16 +106,20 @@ extractTargetQTL <- function(qtl, chr ){
 library(optparse)
 
 option_list <- list(
-        make_option(c('-o', '--outFolder'), help='the path to the output file', default = "")
+        make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
+        make_option(c('-c', '--chromosome'), help = "which chromosome to read in", default = "all")
 )
 
 option.parser <- OptionParser(usage = "%prog [options] QTL_dataset_name_1 QTL_dataset_name_2 ...QTL_dataset_name_N", description = "a script that combines QTL dataset into the format required by METASOFT for meta-analysis", option_list=option_list)
 opt <- parse_args(option.parser, positional_arguments = TRUE)
-
-
-outFolder <- opt$outFolder
-
 data_list <- opt$args
+options <- opt$options
+
+outFolder <- options$outFolder
+chromo <- options$chromosome
+
+message( " * chr is ", chromo )
+message(" * outFolder is", outFolder) 
 
 stopifnot( length( data_list) > 1 ) 
 
@@ -122,20 +132,25 @@ library(tidyverse)
 
 
 qtl_list <- purrr::map(data_list, pullData, type = "QTL" )
-outFolder <- "."
 
 prefix <- paste( data_list, collapse = "-" )
 
-outFile_final <- file.path(outFolder, paste0( prefix, ".metasoft.tsv" ) )
+outFile_final <- file.path(outFolder, paste0( prefix, ".metasoft.input.tsv" ) )
+# if chromosome is specified then just read in from that chromosome
+# else iterate through all
 
-chr_nums <- 1:22
+if( is.na(chromo) ){
+    chr_nums <- 1:22
+    chrs <- paste0("chr", chr_nums)
+}else{
+    chrs <- chromo
+}
 
-chrs <- paste0("chr", chr_nums)
+if( !dir.exists(outFolder) ){ dir.create(outFolder) }
 
-# iterate through chromosomes
 for( chr in chrs){
     message(" * merging data in ", chr )
-    outFile <- file.path( outFolder, paste0(prefix,chr, ".metasoft.input.tsv" ) )
+    outFile <- file.path( outFolder, paste0(prefix, ".", chr, ".metasoft.input.tsv" ) )
     res <- purrr::map( qtl_list, ~{
         extractTargetQTL(.x, chr = chr)
     })  %>% 
@@ -143,7 +158,7 @@ for( chr in chrs){
     # give each column a unique name
     data_names <- unlist(purrr::map( seq(length(data_list)), ~{ res <- paste( c("beta","se"), .x, sep = "."); return(res) }))
     names(res) <- c("snp_gene", data_names)
- 
+    message( " * writing to ", outFile )  
     write_tsv( res, path = outFile, col_names = FALSE)
     rm(res)
     gc()

@@ -5,6 +5,8 @@ outFolder = config["outFolder"]
 
 rule all:
     input:
+        outFolder + "all_COLOC_results_merged_H4_0_no_ld.tsv",
+        outFolder + "all_COLOC_results_merged_H4_0.5_with_ld.tsv",
         expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
 
 
@@ -18,4 +20,14 @@ rule run_COLOC:
         "ml R/3.6.0; ml arrow;"
         "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -o {outFolder}{wildcards.GWAS}/ "
 
-
+rule merge_COLOC:
+    input:
+        expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
+    output:
+        outFolder + "all_COLOC_results_merged_H4_0_no_ld.tsv",
+        outFolder + "all_COLOC_results_merged_H4_0.5_with_ld.tsv"
+    shell:
+        "ml R/3.6.0;"
+        "Rscript merge_COLOC_results.R --threshold 0 -i {outFolder};" 
+        "Rscript merge_COLOC_results.R --threshold 0.5 --ld -i {outFolder} "
+         
