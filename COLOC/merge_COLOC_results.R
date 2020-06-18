@@ -80,6 +80,10 @@ all_res <- select(all_res, GWAS, disease, QTL, -file, everything() )
 all_res$geneid <- map_chr(str_split(all_res$gene, ":"), ~{ .x[ length(.x) ] })
 all_res$geneid <- str_split_fixed(all_res$geneid, "\\.", 2)[,1]
 
+# have separate junction column
+all_res$QTL_junction <- map_chr(str_split(all_res$gene, ":"), ~{ paste0(.x[1], ":", .x[2], "-", .x[3])  })
+
+
 gene_meta <- read_tsv("/sc/hydra/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>% 
     janitor::clean_names() %>%
     select(genename, geneid) %>% distinct()
@@ -98,6 +102,8 @@ all_res$QTL_Ensembl <- gene_meta$geneid[match(all_res$gene, gene_meta$genename)]
 
 all_res$type <- ifelse( grepl("sQTL", all_res$QTL), "sQTL", "eQTL" )
 
+# make junction NA if eQTL
+all_res$QTL_junction <- ifelse(all_res$type == "sQTL", all_res$QTL_junction, NA)
 
 all_res <- select(all_res, disease, GWAS, locus, starts_with("GWAS"), QTL, type, starts_with("QTL"), nsnps, starts_with("PP") )
 
