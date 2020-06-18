@@ -5,7 +5,7 @@ outFolder = config["outFolder"]
 
 rule all:
     input:
-        outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv",
+        outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz",
         #outFolder + "all_COLOC_results_merged_H4_0.5_with_ld.tsv",
         expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
 
@@ -24,7 +24,7 @@ rule merge_COLOC:
     input:
         expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
     output:
-        outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv"#,
+        outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz"#,
         #outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv"
     shell:
         "ml R/3.6.0;"

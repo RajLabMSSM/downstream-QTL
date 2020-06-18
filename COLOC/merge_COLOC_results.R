@@ -22,7 +22,7 @@ if( calculate_LD == TRUE){
     LD_string <- "_no_LD"
 }
 
-outFile <- paste0(inFolder, "all_COLOC_results_merged_H4_", H4_threshold, LD_string,".tsv")
+outFile <- paste0(inFolder, "all_COLOC_results_merged_H4_", H4_threshold, LD_string,".tsv.gz")
 
 message(" * writing to ", outFile)
 
