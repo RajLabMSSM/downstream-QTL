@@ -151,6 +151,9 @@ for( chr in chrs){
         extractTargetQTL(.x, chr = chr)
     })  %>% 
     reduce( inner_join, by = "snp_gene"  )
+    
+    res <- res[ complete.cases(res),]     
+
     # give each column a unique name
     data_names <- unlist(purrr::map( data_list, ~{ res <- paste( c("pvalue"), .x, sep = "."); return(res) }))
     colnames(res) <- c("snp_gene", data_names)

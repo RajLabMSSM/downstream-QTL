@@ -11,7 +11,9 @@ chromosomes = list(range(1,23))
 
 rule all:
     input:
-        expand(dataset_string + ".{chr}.pisquared.input.tsv.gz", chr = chromosomes)
+        outFolder + "pisquared_results.tsv"
+        #dataset_string + ".pisquared.full.input.tsv.gz",
+        #expand(dataset_string + ".{chr}.pisquared.input.tsv.gz", chr = chromosomes)
 
 
 # create matched SNP-Gene P-values for all datasets per chromosome
@@ -30,6 +32,13 @@ rule mergeInputFiles:
     output: dataset_string + ".pisquared.full.input.tsv.gz"
     shell:
         "cat {input} > {output}"
+
+rule runPiSquared:
+    input: dataset_string + ".pisquared.full.input.tsv.gz"
+    output: outFolder + "pisquared_results.tsv"
+    shell:
+        "ml R/3.6.0;"
+        "Rscript run_pisquared.R -o {outFolder} {input} "
 
 
 

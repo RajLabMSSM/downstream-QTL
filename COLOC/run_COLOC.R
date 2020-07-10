@@ -262,7 +262,9 @@ liftOverCoord <- function(coord_string, from = "hg19", to = "hg38"){
         )
     # lift over using rtracklayer
     # watch out for duplicate entries
+    message(" * lifting over....")
     lifted_over <- rtracklayer::liftOver(coord_gr, chain )
+    message(" * lifted!" )
     #return(lifted_over)
     
     stopifnot(length(lifted_over) == length(coord_gr)  )
@@ -373,7 +375,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     # this requires "chr" to be present in QTL data
     if( is.na(mafCol) | force_maf == TRUE ){
         message("       * MAF not present - using 1000 Genomes MAF")
-        stopifnot( "chr" %in% names(col_dict) )
+        #stopifnot( "chr" %in% names(col_dict) )
         names(result)[names(col_dict) == "chr"] <- "chr"
         result <- matchMAF(result, maf = maf_1000g)
     }else{
@@ -381,7 +383,14 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
         names(result)[names(col_dict) == mafCol] <- "MAF"
     }
 
-
+    # deal with edge cases - 1 gene and the gene id is NA
+    if( all( is.na(result$gene) ) ){
+        return(NULL)
+    }else{
+        result <- dplyr::filter(result, !is.na(gene) )
+    }
+    
+    
     # don't forget to square the standard error to get the variance             
     result$varbeta <- result$varbeta^2
     
