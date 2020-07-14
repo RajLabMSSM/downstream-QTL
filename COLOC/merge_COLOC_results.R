@@ -127,7 +127,7 @@ calc_LD <- function( x ){
    
     # weird snps with "esv" instead of "rs" - remove
     snps <- snps[ grepl("rs", snps) ]
-     
+    # also ignores non-rs IDs - in format 1:1:C:G
     # if only one SNP then QTL and GWAS must be same SNP
     if( length(snps) == 1){ 
         x$LD <- 1; return(x) 

@@ -348,7 +348,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     seCol <- qtl$full_se
     snpCol <- qtl$full_snp
     mafCol <- qtl$full_maf
-   
+    chrCol <- qtl$full_chr
+    posCol <- qtl$full_pos
     # read in subset of QTLs 
     if( qtl$full_file_type == "parquet" ){
         result <- extractQTL_parquet(qtl, coord, sig_level)
@@ -370,7 +371,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     names(result)[names(col_dict) == betaCol]  <- "beta"
     names(result)[names(col_dict) == seCol]    <- "varbeta"
     names(result)[names(col_dict) == snpCol]   <- "snp"
-    
+    names(result)[names(col_dict) == chrCol]   <- "QTL_chr"
+    names(result)[names(col_dict) == posCol]   <- "QTL_pos"
     # deal with MAF - meta-analysis outputs won't have it
     # this requires "chr" to be present in QTL data
     if( is.na(mafCol) | force_maf == TRUE ){
@@ -398,7 +400,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     result <- dplyr::filter(result, varbeta != 0) 
 
     # retain only associations within locus coords
-    res_subset <- dplyr::select(result, gene, snp, pvalues, beta, varbeta, MAF) #%>%
+    res_subset <- dplyr::select(result, gene, snp, pvalues, beta, varbeta, MAF, QTL_chr, QTL_pos) #%>%
         #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
 
     # split by gene, convert to list object
@@ -438,17 +440,31 @@ runCOLOC <- function(gwas, qtl, hit){
     
     # get hit info from GWAS
     hit_snp <- hit$snp
-    hit_info <- as.data.frame(g, stringsAsFactors = FALSE) %>% filter(snp == hit_snp) %>% 
-                select(GWAS_SNP = snp, GWAS_P = pvalues, GWAS_effect_size = beta, GWAS_MAF = MAF) %>%
-                mutate(locus = hit$locus) %>% select(locus, everything() )
-    
+    # this assumes that the hit SNP is within the g object
+    # if the top hit doesn't have an RSID or cannot be MAF matched then this is violated
+    # I will have to use the hit object instead and accept that not all top_loci lists include the MAF, P value etc.
+    #if( hit_snp == hit$snp ){
+    #hit_info <- as.data.frame(g, stringsAsFactors = FALSE) %>% filter(snp == hit_snp) %>% 
+    #            select(GWAS_SNP = snp, GWAS_P = pvalues, GWAS_effect_size = beta, GWAS_MAF = MAF) %>%
+    #            mutate(locus = hit$locus) %>% select(locus, everything() )
+    #}else{
+    # now just use top loci
+    hit_info <- hit %>%
+            select(locus, GWAS_SNP = snp, GWAS_P = p)
+    #}
  
     # if GWAS is hg19 then lift over to hg38
+    # use the lifted over position in hit_info
     if(gwas$build != qtl$build){
         qtl_coord <- liftOverCoord(hit_coord, from = gwas$build, to = qtl$build)
     }else{
         qtl_coord <- hit_coord
     }
+    # record the position of the GWAS top SNP
+    hit_info$GWAS_chr <- splitCoords(qtl_coord)$chr
+    hit_info$GWAS_pos <- splitCoords(qtl_coord)$end
+
+
     qtl_range <- joinCoords(qtl_coord, flank = 1e6)
     
     message("       * extracting QTLs")
@@ -459,7 +475,7 @@ runCOLOC <- function(gwas, qtl, hit){
         map_df( ~{ 
             as.data.frame(.x, stringsAsFactors=FALSE) %>% 
             arrange(pvalues) %>% head(1) %>% 
-            select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_MAF = MAF)
+            select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_MAF = MAF, QTL_chr, QTL_pos)
         }) 
     
     # actually run COLOC
