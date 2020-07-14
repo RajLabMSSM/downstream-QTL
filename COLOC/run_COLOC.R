@@ -371,9 +371,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     names(result)[names(col_dict) == betaCol]  <- "beta"
     names(result)[names(col_dict) == seCol]    <- "varbeta"
     names(result)[names(col_dict) == snpCol]   <- "snp"
-    names(result)[names(col_dict) == chrCol]   <- "QTL_chr"
-    names(result)[names(col_dict) == posCol]   <- "QTL_pos"
-    # deal with MAF - meta-analysis outputs won't have it
+        # deal with MAF - meta-analysis outputs won't have it
     # this requires "chr" to be present in QTL data
     if( is.na(mafCol) | force_maf == TRUE ){
         message("       * MAF not present - using 1000 Genomes MAF")
@@ -387,11 +385,16 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
 
     # deal with edge cases - 1 gene and the gene id is NA
     if( all( is.na(result$gene) ) ){
+        message(" * no genes in QTL result")
         return(NULL)
     }else{
         result <- dplyr::filter(result, !is.na(gene) )
     }
-    
+    # if MAF needs matching then chrCol will be "chr" - change it back to "QTL_chr"
+    names(result)[names(col_dict) == chrCol]   <- "QTL_chr"
+    names(result)[names(col_dict) == posCol]   <- "QTL_pos"
+
+    #print(head(result) ) 
     
     # don't forget to square the standard error to get the variance             
     result$varbeta <- result$varbeta^2
@@ -437,7 +440,6 @@ runCOLOC <- function(gwas, qtl, hit){
     # extract GWAS and QTL summary for given coord
     message("       * extracting GWAS")
     g <- extractGWAS(gwas, hit_range)
-    
     # get hit info from GWAS
     hit_snp <- hit$snp
     # this assumes that the hit SNP is within the g object
@@ -449,6 +451,9 @@ runCOLOC <- function(gwas, qtl, hit){
     #            mutate(locus = hit$locus) %>% select(locus, everything() )
     #}else{
     # now just use top loci
+   
+    # problem when no p column in hit!
+
     hit_info <- hit %>%
             select(locus, GWAS_SNP = snp, GWAS_P = p)
     #}
