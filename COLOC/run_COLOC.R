@@ -177,6 +177,8 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     seCol <- gwas$full_se
     snpCol <- gwas$full_snp
     mafCol <- gwas$full_maf
+    a1Col <- gwas$full_A1
+    a2Col <- gwas$full_A2
     # assume coord is a string following chr:start-end format
     chr <- splitCoords(coord)["chr"]
     # make sure chromosome names in coord match GWAS chr naming
@@ -208,6 +210,8 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     names(result)[names(col_dict) == betaCol]  <- "beta"
     names(result)[names(col_dict) == seCol]  <- "varbeta"
     names(result)[names(col_dict) == snpCol] <- "snp" 
+    names(result)[names(col_dict) == a1Col] <- "A1"
+    names(result)[names(col_dict) == a2Col] <- "A2"
     #return(result)
     
     # deal with MAF if missing
@@ -223,7 +227,7 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     # convert standard error to the variance
     result$varbeta <- result$varbeta^2
    
-    result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos)
+    result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos, A1, A2)
     
     result <- as.list(result)
     

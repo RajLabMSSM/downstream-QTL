@@ -22,6 +22,13 @@ if( calculate_LD == TRUE){
     LD_string <- "_no_LD"
 }
 
+fix_chr <- function(chr_string){
+    if( all(!grepl("chr", chr_string) ) ){
+        chr_string <- paste0("chr", chr_string)
+    }
+    return(chr_string)
+}
+
 outFile <- paste0(inFolder, "all_COLOC_results_merged_H4_", H4_threshold, LD_string,".tsv.gz")
 
 message(" * writing to ", outFile)
@@ -39,7 +46,8 @@ names(all_files) <- all_files
 all_res <- purrr::map_df(all_files, ~{
     read_tsv(.x) %>% 
     filter( PP.H4.abf >= H4_threshold ) %>% 
-    mutate(locus = as.character(locus)) 
+    mutate(locus = as.character(locus)) %>%
+    mutate( QTL_chr = fix_chr(QTL_chr), GWAS_chr = fix_chr(GWAS_chr), GWAS_P = as.numeric(GWAS_P) )
 }, .id = "file")
 
 all_res <- mutate(all_res, file = gsub("_COLOC.tsv", "", basename(file) ) )
@@ -98,12 +106,12 @@ all_res$genename <- gene_meta$genename[ match(all_res$geneid, gene_meta$geneid) 
 all_res$QTL_Gene <- coalesce(all_res$genename, all_res$geneid)
 
 # add geneid back to make sure
-all_res$QTL_Ensembl <- gene_meta$geneid[match(all_res$gene, gene_meta$genename)] 
+all_res$QTL_Ensembl <- gene_meta$geneid[match(all_res$QTL_Gene, gene_meta$genename)] 
 
 all_res$type <- ifelse( grepl("sQTL", all_res$QTL), "sQTL", "eQTL" )
 
 # make junction NA if eQTL
-all_res$QTL_junction <- ifelse(all_res$type == "sQTL", all_res$QTL_junction, NA)
+all_res$QTL_junction <- ifelse(all_res$type == "sQTL", all_res$QTL_junction, ".")
 
 all_res <- select(all_res, disease, GWAS, locus, starts_with("GWAS"), QTL, type, starts_with("QTL"), nsnps, starts_with("PP") )
 
