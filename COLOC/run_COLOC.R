@@ -225,8 +225,9 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     }
 
     # convert standard error to the variance
+    # se is standard error - not standard deviation!
     result$varbeta <- result$varbeta^2
-   
+    
     result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos, A1, A2)
     
     result <- as.list(result)
@@ -375,7 +376,12 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     names(result)[names(col_dict) == betaCol]  <- "beta"
     names(result)[names(col_dict) == seCol]    <- "varbeta"
     names(result)[names(col_dict) == snpCol]   <- "snp"
-        # deal with MAF - meta-analysis outputs won't have it
+    # Young microglia use log10P - convert
+    if( pvalCol == "log10_p"){
+        result$pvalues <- 10^result$pvalues
+    }
+
+    # deal with MAF - meta-analysis outputs won't have it
     # this requires "chr" to be present in QTL data
     if( is.na(mafCol) | force_maf == TRUE ){
         message("       * MAF not present - using 1000 Genomes MAF")
@@ -402,7 +408,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     
     # don't forget to square the standard error to get the variance             
     result$varbeta <- result$varbeta^2
-    
+ 
     # remove rows with variance of 0 - this will corrupt COLOC
     result <- dplyr::filter(result, varbeta != 0) 
 
