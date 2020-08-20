@@ -1,0 +1,10 @@
+datasets:
+    - Microglia_sQTL_THA
+    - Microglia_sQTL_SVZ
+    - Microglia_sQTL_MFG
+    - Microglia_sQTL_STG
+
+outFolder: "/sc/hydra/projects/ad-omics/microglia_omics/METASOFT/sQTL/"
+dataCode: "microglia_sqtl"
+
+vcf: "/sc/hydra/projects/pd-omics/glia_omics/eQTL/post_imputation_filtering/eur/filtered_variants/AllChr.hg38.sort.filt.dbsnp.snpeff.vcf.gz"

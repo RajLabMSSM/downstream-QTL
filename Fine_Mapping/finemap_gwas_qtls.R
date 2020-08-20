@@ -14,12 +14,31 @@ options(echo=TRUE)
 library(tidyverse)
 library(echolocatoR)
 
+# replace gene IDs with gene names
+gene_meta <- readr::read_tsv("/sc/hydra/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>%
+    select(GENENAME, GENEID) %>% distinct()
+
 # for each locus, find the genes with PP4 > 0.5
 # output - just the genes with a PP4 > threshold
 prep_locus <- function(locus, pp4_threshold = 0.5){
-    pp4 <- purrr::map_df( locus ,~{.x$df}, .id = "gene" ) %>% dplyr::filter(PP.H4.abf > pp4_threshold)
-    if( nrow(pp4) == 0){ return(NULL) }
-    locus <- locus[ pp4$gene ]
+    pp4 <- purrr::map_df( locus ,~{.x$df}, .id = "gene" ) %>% 
+        dplyr::filter(PP.H4.abf > pp4_threshold)
+        if( nrow(pp4) == 0){ return(NULL) }
+        locus <- locus[ pp4$gene ]
+    return(locus)
+}
+
+map_gene <- function(locus){
+    # for each QTL gene in locus replace gene id with gene name
+    # replace locus with paste0(locus, ":", genename)
+    if( is.null(locus) ){ return(NULL) }
+    names(locus) <- gene_meta$GENENAME[ match(names(locus), gene_meta$GENEID) ]
+    locus <- map(locus, ~{
+        gene_df <- .x$object$results
+        gene_df$gene <- gene_meta$GENENAME[ match(gene_df$gene, gene_meta$GENEID) ]
+        .x$object$results <- gene_df
+        return(.x)
+    })
     return(locus)
 }
 
@@ -46,6 +65,9 @@ load(inputfile)
 
 # extract colocalized genes
 prepped <- map(all_obj, prep_locus)
+
+# convert gene id to gene name
+prepped <- map(prepped, map_gene)
 
 # just use BIN1 for now
 #prepped <- list(prepped$BIN1)
@@ -159,7 +181,7 @@ top_SNPs <- import_topSNPs(
   pval_col="qtl.pvalues",
   effect_col="qtl.beta",
   gene_col="gene",
-  locus_col = "gene",
+  locus_col = "Locus",
   grouping_vars = c("Locus","Gene"))
 
 loci <- gene_locus_list(top_SNPs)
