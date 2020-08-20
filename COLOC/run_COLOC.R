@@ -76,7 +76,6 @@ pullData <- function(dataset, type = "GWAS"){
     gwas <- gwas_db[ gwas_db$dataset == dataset & !is.na(gwas_db$dataset), ]
     stopifnot( nrow(gwas) == 1 )
 
-    #stopifnot( all( c("full_path", "full_chrom", "full_pos") %in% names(gwas) ) )
 
     #stopifnot( file.exists(gwas$full_path) )
 
@@ -84,7 +83,12 @@ pullData <- function(dataset, type = "GWAS"){
 }
 
 extractLoci <- function(gwas){
-    loci_path <- gwas$top_path
+    loci_path <- gwas$top_filtered_path
+    
+    # stupid exception for Daner_2020 - filtered loci are totally different file right now
+    if(gwas$dataset == "Daner_2020"){
+        loci_path <- gwas$top_path
+    }
     # loci are stored either in comma-separated (csv), tab-separated files (txt, tsv) or in excel files (xlsx, xlsm)
     loci_file <- unlist(stringr::str_split(basename(loci_path), "\\."))
     loci_ext <- loci_file[ length(loci_file) ]
@@ -105,6 +109,8 @@ extractLoci <- function(gwas){
     # rename columns
     # return only core set of columns - locus, SNP, chrom, position 
     stopifnot( all(!is.na(c(gwas$top_locus, gwas$top_snp, gwas$top_chrom, gwas$top_pos) ) ) )
+    
+    stopifnot( all( c(gwas$top_locus, gwas$top_snp, gwas$top_chrom) %in% colnames(loci_df) ) )
     loci_df$locus <- loci_df[[gwas$top_locus]] 
     loci_df$snp <- loci_df[[gwas$top_snp]]
     loci_df$chr <- loci_df[[gwas$top_chrom]]
@@ -317,7 +323,7 @@ extractQTL_parquet <- function(qtl, coord, sig_level = 0.05){
 
 # if QTL nominal stats stored in single tabixed file
 extractQTL_tabix <- function(qtl, coord){
-    if( qtl$full_chr_type == "chr1" ){
+    if( qtl$full_chrom_type == "chr1" ){
         if( !grepl("chr", coord) ){ 
             coord <- paste0("chr", coord)
         }
@@ -346,14 +352,14 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     
 
     # check columns
-    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_beta, qtl$full_se, qtl$N, qtl$build) ) ))
+    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
-    betaCol <- qtl$full_beta
+    betaCol <- qtl$full_effect
     phenoCol <- qtl$full_pheno
     seCol <- qtl$full_se
     snpCol <- qtl$full_snp
     mafCol <- qtl$full_maf
-    chrCol <- qtl$full_chr
+    chrCol <- qtl$full_chrom
     posCol <- qtl$full_pos
     # read in subset of QTLs 
     if( qtl$full_file_type == "parquet" ){
