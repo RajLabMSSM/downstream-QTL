@@ -63,13 +63,8 @@ pullData <- function(dataset, type = "GWAS"){
 
     message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
-    if( type == "GWAS"){
-        n_sheet <- 2
-    }
-    if( type == "QTL"){
-        n_sheet <- 3
-    }
-    gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = n_sheet,na= c("", "-","NA")))
+
+    gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = type, na= c("", "-","NA")))
     
     stopifnot( dataset %in% gwas_db$dataset )
 
@@ -594,11 +589,14 @@ library(GenomicRanges)
 library(rtracklayer)
 library(tidyverse)
 
+maf_1000gp1 <- "/sc/hydra/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
+maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
+
 # load in MAF table
 
 if( !exists("maf_1000g")){
 
-maf_1000g <- loadMAF("/sc/hydra/projects/ad-omics/data/references/1000G/1000G_EUR_MAF.bed.gz")
+maf_1000g <- loadMAF(maf_1000gp3)
 # load in liftover chain
 chain_hg19_hg38 <- import.chain("/sc/hydra/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
 
