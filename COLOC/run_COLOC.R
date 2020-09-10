@@ -63,20 +63,14 @@ pullData <- function(dataset, type = "GWAS"){
 
     message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
-    if( type == "GWAS"){
-        n_sheet <- 2
-    }
-    if( type == "QTL"){
-        n_sheet <- 3
-    }
-    gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = n_sheet,na= c("", "-","NA")))
+
+    gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = type, na= c("", "-","NA")))
     
     stopifnot( dataset %in% gwas_db$dataset )
 
     gwas <- gwas_db[ gwas_db$dataset == dataset & !is.na(gwas_db$dataset), ]
     stopifnot( nrow(gwas) == 1 )
 
-    #stopifnot( all( c("full_path", "full_chrom", "full_pos") %in% names(gwas) ) )
 
     #stopifnot( file.exists(gwas$full_path) )
 
@@ -84,7 +78,12 @@ pullData <- function(dataset, type = "GWAS"){
 }
 
 extractLoci <- function(gwas){
-    loci_path <- gwas$top_path
+    loci_path <- gwas$top_filtered_path
+    
+    # stupid exception for Daner_2020 - filtered loci are totally different file right now
+    if(gwas$dataset == "Daner_2020"){
+        loci_path <- gwas$top_path
+    }
     # loci are stored either in comma-separated (csv), tab-separated files (txt, tsv) or in excel files (xlsx, xlsm)
     loci_file <- unlist(stringr::str_split(basename(loci_path), "\\."))
     loci_ext <- loci_file[ length(loci_file) ]
@@ -105,6 +104,8 @@ extractLoci <- function(gwas){
     # rename columns
     # return only core set of columns - locus, SNP, chrom, position 
     stopifnot( all(!is.na(c(gwas$top_locus, gwas$top_snp, gwas$top_chrom, gwas$top_pos) ) ) )
+    
+    stopifnot( all( c(gwas$top_locus, gwas$top_snp, gwas$top_chrom) %in% colnames(loci_df) ) )
     loci_df$locus <- loci_df[[gwas$top_locus]] 
     loci_df$snp <- loci_df[[gwas$top_snp]]
     loci_df$chr <- loci_df[[gwas$top_chrom]]
@@ -139,6 +140,7 @@ loadMAF <- function(path){
 # match on RS ID
 matchMAF <- function(data, maf){
     stopifnot( "snp" %in% names(data) )
+    stopifnot( "chr" %in% names(data) )
     #stopifnot( all(!is.na(data$snp) ))
     chr <- gsub("chr", "", unique(data$chr))
     stopifnot( !is.na(chr) )
@@ -176,6 +178,8 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     seCol <- gwas$full_se
     snpCol <- gwas$full_snp
     mafCol <- gwas$full_maf
+    a1Col <- gwas$full_A1
+    a2Col <- gwas$full_A2
     # assume coord is a string following chr:start-end format
     chr <- splitCoords(coord)["chr"]
     # make sure chromosome names in coord match GWAS chr naming
@@ -207,22 +211,25 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/da
     names(result)[names(col_dict) == betaCol]  <- "beta"
     names(result)[names(col_dict) == seCol]  <- "varbeta"
     names(result)[names(col_dict) == snpCol] <- "snp" 
+    names(result)[names(col_dict) == a1Col] <- "A1"
+    names(result)[names(col_dict) == a2Col] <- "A2"
     #return(result)
     
     # deal with MAF if missing
     if( is.na(mafCol) | force_maf == TRUE ){
-        message(" * MAF not present - using 1000 Genomes MAF")
+        message("       * MAF not present - using 1000 Genomes MAF")
         # how to get this in to the function? it can't find maf_1000g
         result <- matchMAF(result, maf = maf_1000g)
     }else{
-        message(" * using supplied MAF")
+        message("       * using supplied MAF")
         names(result)[names(col_dict) == mafCol] <- "MAF" 
     }
 
     # convert standard error to the variance
+    # se is standard error - not standard deviation!
     result$varbeta <- result$varbeta^2
-   
-    result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos)
+    
+    result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos, A1, A2)
     
     result <- as.list(result)
     
@@ -261,7 +268,9 @@ liftOverCoord <- function(coord_string, from = "hg19", to = "hg38"){
         )
     # lift over using rtracklayer
     # watch out for duplicate entries
+    message(" * lifting over....")
     lifted_over <- rtracklayer::liftOver(coord_gr, chain )
+    message(" * lifted!" )
     #return(lifted_over)
     
     stopifnot(length(lifted_over) == length(coord_gr)  )
@@ -309,21 +318,21 @@ extractQTL_parquet <- function(qtl, coord, sig_level = 0.05){
 
 # if QTL nominal stats stored in single tabixed file
 extractQTL_tabix <- function(qtl, coord){
-    if( qtl$full_chr_type == "chr1" ){
+    if( qtl$full_chrom_type == "chr1" ){
         if( !grepl("chr", coord) ){ 
             coord <- paste0("chr", coord)
         }
     }
     stopifnot( file.exists(qtl$full_path) )
     cmd <- paste( "ml bcftools; tabix -h ", qtl$full_path, coord )
-    message(" * running command: ", cmd)
+    message("       * running command: ", cmd)
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
     # deal with regions of no QTL association
     if( nrow(result) == 0){ 
         return(NULL) 
     }
     #stopifnot( nrow(result) > 0 )
-    message(" * QTL extracted!")
+    message("       * QTL extracted!")
     return(result)
 }
 
@@ -331,21 +340,22 @@ extractQTL_tabix <- function(qtl, coord){
 # extract all nominal QTL P-values overlapping the flanked GWAS hit
 # split by Gene being tested
 # sig_level doesn't do anything yet
-extractQTL <- function(qtl, coord, sig_level = 0.05){
+extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     # variables stored in qtl
     # if qtl type is parquet then read in parquet files
     # if qtl type is tabix then query the coordinates through tabix 
     
 
     # check columns
-    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_beta, qtl$full_se, qtl$full_maf, qtl$N, qtl$build) ) ))
+    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
-    betaCol <- qtl$full_beta
+    betaCol <- qtl$full_effect
     phenoCol <- qtl$full_pheno
     seCol <- qtl$full_se
     snpCol <- qtl$full_snp
     mafCol <- qtl$full_maf
-   
+    chrCol <- qtl$full_chrom
+    posCol <- qtl$full_pos
     # read in subset of QTLs 
     if( qtl$full_file_type == "parquet" ){
         result <- extractQTL_parquet(qtl, coord, sig_level)
@@ -367,14 +377,44 @@ extractQTL <- function(qtl, coord, sig_level = 0.05){
     names(result)[names(col_dict) == betaCol]  <- "beta"
     names(result)[names(col_dict) == seCol]    <- "varbeta"
     names(result)[names(col_dict) == snpCol]   <- "snp"
+    # Young microglia use log10P - convert
+    if( pvalCol == "log10_p"){
+        result$pvalues <- 10^result$pvalues
+    }
+
+    # deal with MAF - meta-analysis outputs won't have it
+    # this requires "chr" to be present in QTL data
+    if( is.na(mafCol) | force_maf == TRUE ){
+        message("       * MAF not present - using 1000 Genomes MAF")
+        #stopifnot( "chr" %in% names(col_dict) )
+        names(result)[names(col_dict) == "chr"] <- "chr"
+        result <- matchMAF(result, maf = maf_1000g)
+    }else{
+        message("       * using supplied MAF")
+        names(result)[names(col_dict) == mafCol] <- "MAF"
+    }
+
+    # deal with edge cases - 1 gene and the gene id is NA
+    if( all( is.na(result$gene) ) ){
+        message(" * no genes in QTL result")
+        return(NULL)
+    }else{
+        result <- dplyr::filter(result, !is.na(gene) )
+    }
+    # if MAF needs matching then chrCol will be "chr" - change it back to "QTL_chr"
+    names(result)[names(col_dict) == chrCol]   <- "QTL_chr"
+    names(result)[names(col_dict) == posCol]   <- "QTL_pos"
+
+    #print(head(result) ) 
+    
     # don't forget to square the standard error to get the variance             
     result$varbeta <- result$varbeta^2
-    
+ 
     # remove rows with variance of 0 - this will corrupt COLOC
     result <- dplyr::filter(result, varbeta != 0) 
 
     # retain only associations within locus coords
-    res_subset <- dplyr::select(result, gene, snp, pvalues, beta, varbeta, MAF) #%>%
+    res_subset <- dplyr::select(result, gene, snp, pvalues, beta, varbeta, MAF, QTL_chr, QTL_pos) #%>%
         #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
 
     # split by gene, convert to list object
@@ -402,32 +442,48 @@ extractQTL <- function(qtl, coord, sig_level = 0.05){
 ## COLOC results - this should include the GWAS locus, the gene of interest, the top QTL variant and the top QTL p-value
 ## object - this should be a table combining the two input datasets, inner joined on "snp", to be used for plotting.
 runCOLOC <- function(gwas, qtl, hit){
-    message(" * analysing locus: ", hit$locus )
+    message(" * Analysing LOCUS: ", hit$locus )
     # hit is a dataframe containing "snp", "chr", "pos", "locus"
     
     hit_coord <- joinCoords(hit, flank = 0)
     hit_range <- joinCoords(hit, flank = 1e6)
  
     # extract GWAS and QTL summary for given coord
-    message(" * extracting GWAS")
+    message("       * extracting GWAS")
     g <- extractGWAS(gwas, hit_range)
-    
     # get hit info from GWAS
     hit_snp <- hit$snp
-    hit_info <- as.data.frame(g, stringsAsFactors = FALSE) %>% filter(snp == hit_snp) %>% 
-                select(GWAS_SNP = snp, GWAS_P = pvalues, GWAS_effect_size = beta, GWAS_MAF = MAF) %>%
-                mutate(locus = hit$locus) %>% select(locus, everything() )
-    
+    # this assumes that the hit SNP is within the g object
+    # if the top hit doesn't have an RSID or cannot be MAF matched then this is violated
+    # I will have to use the hit object instead and accept that not all top_loci lists include the MAF, P value etc.
+    #if( hit_snp == hit$snp ){
+    #hit_info <- as.data.frame(g, stringsAsFactors = FALSE) %>% filter(snp == hit_snp) %>% 
+    #            select(GWAS_SNP = snp, GWAS_P = pvalues, GWAS_effect_size = beta, GWAS_MAF = MAF) %>%
+    #            mutate(locus = hit$locus) %>% select(locus, everything() )
+    #}else{
+    # now just use top loci
+   
+    # problem when no p column in hit!
+
+    hit_info <- hit %>%
+            select(locus, GWAS_SNP = snp, GWAS_P = p)
+    #}
  
     # if GWAS is hg19 then lift over to hg38
+    # use the lifted over position in hit_info
     if(gwas$build != qtl$build){
         qtl_coord <- liftOverCoord(hit_coord, from = gwas$build, to = qtl$build)
     }else{
         qtl_coord <- hit_coord
     }
+    # record the position of the GWAS top SNP
+    hit_info$GWAS_chr <- splitCoords(qtl_coord)$chr
+    hit_info$GWAS_pos <- splitCoords(qtl_coord)$end
+
+
     qtl_range <- joinCoords(qtl_coord, flank = 1e6)
     
-    message(" * extracting QTLs")
+    message("       * extracting QTLs")
     q <- extractQTL(qtl, qtl_range)
     if( is.null(q) ){ return(NULL) }
     # for each gene extract top QTL SNP    
@@ -435,11 +491,11 @@ runCOLOC <- function(gwas, qtl, hit){
         map_df( ~{ 
             as.data.frame(.x, stringsAsFactors=FALSE) %>% 
             arrange(pvalues) %>% head(1) %>% 
-            select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_MAF = MAF)
+            select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_MAF = MAF, QTL_chr, QTL_pos)
         }) 
     
     # actually run COLOC
-        message(" * running COLOC")
+        message("      * running COLOC")
     # run COLOC on each QTL gene 
     # return the results table and an object containing g and q
     coloc_res <- 
@@ -457,11 +513,11 @@ runCOLOC <- function(gwas, qtl, hit){
             coloc_df <- as.data.frame(t(coloc_object$summary), stringsAsFactors = FALSE)
             return( list(df = coloc_df, object = coloc_object) )
         })
-    message("COLOC finished")
+    message("       * COLOC finished")
     coloc_df <- map_df(coloc_res, "df", .id = "gene") %>% 
         dplyr::mutate(locus = hit$locus ) %>%
         dplyr::select(locus, gene, everything() )
-    message("COLOC res created")
+    message("       * COLOC res created")
     # bind coloc_res to other tables
     full_res <- full_join(qtl_info, coloc_df, by = "gene")
     full_res <- full_join(hit_info, full_res, by = "locus")
@@ -533,11 +589,14 @@ library(GenomicRanges)
 library(rtracklayer)
 library(tidyverse)
 
+maf_1000gp1 <- "/sc/hydra/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
+maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
+
 # load in MAF table
 
 if( !exists("maf_1000g")){
 
-maf_1000g <- loadMAF("/sc/hydra/projects/ad-omics/data/references/1000G/1000G_EUR_MAF.bed.gz")
+maf_1000g <- loadMAF(maf_1000gp3)
 # load in liftover chain
 chain_hg19_hg38 <- import.chain("/sc/hydra/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
 

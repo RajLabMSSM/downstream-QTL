@@ -1,0 +1,11 @@
+datasets:
+    - Frontal_Cortex_NYGC
+    - Cerebellum_NYGC
+    - Cervical_Spinal_Cord_NYGC
+    - Lumbar_Spinal_Cord_NYGC
+    - Lateral_Motor_Cortex_NYGC
+    - Medial_Motor_Cortex_NYGC
+    - Temporal_Cortex_NYGC
+outFolder: "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/METASOFT/"
+dataCode: "all_nygc_eqtl"
+vcf: "test.vcf"

@@ -1,0 +1,13 @@
+__default__:
+  #partition: chimera
+  queue: express
+  cores: 6
+  mem: 3000
+  time: '720'
+  name: $(basename $(pwd)):{rule}:{wildcards}
+  output: logs/{rule}:{wildcards}.stdout
+  error: logs/{rule}:{wildcards}.stderr
+runPiSquared:
+   cores: 32
+   mem: 3000
+   time: '720'

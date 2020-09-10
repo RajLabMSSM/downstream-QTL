@@ -1,0 +1,44 @@
+datasets = config["datasets"]
+outFolder = config["outFolder"]
+
+dataset_string = "-".join(datasets)
+
+outFolder = config["outFolder"]
+
+dataset_string = outFolder + dataset_string
+
+chromosomes = list(range(1,23))
+
+rule all:
+    input:
+        outFolder + "pisquared_results.tsv"
+        #dataset_string + ".pisquared.full.input.tsv.gz",
+        #expand(dataset_string + ".{chr}.pisquared.input.tsv.gz", chr = chromosomes)
+
+
+# create matched SNP-Gene P-values for all datasets per chromosome
+rule createInputFiles:
+    output:
+       dataset_string + ".{chr}.pisquared.input.tsv.gz"
+    params:
+        dataset_args = " ".join(datasets)
+    shell:
+        "ml R/3.6.0;"
+        "Rscript create_pisquared_input.R -c {wildcards.chr} -o {outFolder} {params.dataset_args} "
+
+# merge into a single giant file
+rule mergeInputFiles:
+    input: expand(dataset_string + ".{chr}.pisquared.input.tsv.gz", chr = chromosomes)
+    output: dataset_string + ".pisquared.full.input.tsv.gz"
+    shell:
+        "cat {input} > {output}"
+
+rule runPiSquared:
+    input: dataset_string + ".pisquared.full.input.tsv.gz"
+    output: outFolder + "pisquared_results.tsv"
+    shell:
+        "ml R/3.6.0;"
+        "Rscript run_pisquared.R -o {outFolder} {input} "
+
+
+

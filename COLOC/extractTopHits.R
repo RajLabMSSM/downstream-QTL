@@ -11,7 +11,7 @@ library(dplyr)
 library(readr)
 library(purrr)
 dir <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/"
-outFile <- "Nicolas_2018_hits_1e-5.tsv"
+outFile <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_hits_1e-5.tsv"
 threshold <- 1e-5
 blocksize <- 1e6
 
@@ -29,10 +29,10 @@ option.parser <- OptionParser(option_list=option_list)
 opt <- parse_args(option.parser)
 
 
-outFile <- opt$outFile
-dir <- opt$gwas_dir
-threshold <- as.numeric(opt$threshold)
-blocksize <- as.numeric( opt$blockSize) 
+#outFile <- opt$outFile
+#dir <- opt$gwas_dir
+#threshold <- as.numeric(opt$threshold)
+#blocksize <- as.numeric( opt$blockSize) 
 
 # for each chr
 # read in GWAS SNPs
@@ -43,7 +43,8 @@ blocksize <- as.numeric( opt$blockSize)
 
 files <- list.files(path = dir, pattern = "*_chr[0-9]*.tsv.gz$", full.names = TRUE)
 
-
+stopifnot(length(files) > 0)
+print(files)
 
 top_hits <- 
     map_df(files, ~{
@@ -59,8 +60,9 @@ top_hits <-
 })
 
 hits_df <- top_hits %>%
-    mutate(end = pos + 1 ) %>%
-    select(chr, pos, end, everything() ) %>%
-    rename("chr" = chr, start = pos )
+    dplyr::mutate(start = pos, end = pos + 1 ) %>%
+    dplyr::mutate(locus = paste0("locus_", chr, "_", hm_rsid) ) %>%
+    dplyr::select(locus, chr, start, end, everything() )
+    
 
 write_tsv(hits_df, path = outFile)

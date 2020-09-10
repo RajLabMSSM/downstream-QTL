@@ -1,0 +1,21 @@
+sources:
+    - Microglia_all_regions
+    - Microglia_THA
+    - Microglia_SVZ
+    - Microglia_MFG
+    - Microglia_STG
+
+targets:
+    - Microglia_Young
+    - Microglia_THA
+    - Microglia_SVZ
+    - Microglia_MFG
+    - Microglia_STG
+    - Monocytes_Fairfax
+    - Monocytes_MyND
+    - DLPFC_ROSMAP
+
+# where to cut off the target QTLs in significance
+threshold: 0.1
+outFolder:
+    "/sc/hydra/projects/ad-omics/microglia_omics/qvalue/"

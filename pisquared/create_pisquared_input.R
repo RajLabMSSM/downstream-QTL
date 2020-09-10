@@ -1,11 +1,3 @@
-# Create METASOFT input file
-
-# arguments:
-# dataset names wanted for meta-analysis
-# path to outFile
-
-# use the GWAS/QTL database to make easy
-
 
 # pull entry from GWAS/QTL DB
 pullData <- function(dataset, type = "QTL"){
@@ -34,6 +26,7 @@ pullData <- function(dataset, type = "QTL"){
     return(gwas)
 }
 
+
 # per chrom (or chunk?) read in QTL and extract SNP, phenotype, beta and SE
 extractTargetQTL <- function(qtl, chr ){
     require(dplyr)
@@ -48,11 +41,17 @@ extractTargetQTL <- function(qtl, chr ){
             chr <- paste0("chr", chr)
         }
     }
-    
+
     # read in QTL
-    cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr)
+    # use dark awk magic to remove the clusterID while reading in
+    if( qtl$phenotype == "sQTL" ){
+        cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr, ' | awk \'{gsub(/clu_[0-9]+_[+-]:/, ""); print }\' ')
+    }else{
+        cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr)
+    }
     message( " * ", cmd)
-    result <- data.table::fread( cmd = cmd, nThread = 8 )
+    result <- data.table::fread( cmd = cmd, nThread = 8 , fill = TRUE)
+    message( " * QTL read in!" )
     if( nrow(result) == 0){
         return(NULL)
     }
@@ -89,27 +88,34 @@ extractTargetQTL <- function(qtl, chr ){
     # merge SNP and pheno
     result$snp_gene <- paste0(result$snp ,"-", result$pheno)
     
-    # subset out just SNP-Gene pairs in source_qtls
+    # subset out just SNP-Gene and P-value
     res_subset <- 
         result %>%
-        select( snp_gene, beta, se)
-
+        select( snp_gene, pvalue)
+    print( head(res_subset) )
     return(res_subset)
 }
+
 
 library(optparse)
 
 option_list <- list(
-        make_option(c('-o', '--outFolder'), help='the path to the output file', default = "")
+        make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
+        make_option(c('-c', '--chromosome'), help = "which chromosome to read in", default = "")
 )
 
-option.parser <- OptionParser(usage = "%prog [options] QTL_dataset_name_1 QTL_dataset_name_2 ...QTL_dataset_name_N", description = "a script that combines QTL dataset into the format required by METASOFT for meta-analysis", option_list=option_list)
+option.parser <- OptionParser(usage = "%prog [options] QTL_dataset_name_1 QTL_dataset_name_2 ...QTL_dataset_name_N", description = "a script that combines QTL dataset into the format required by pisquared", option_list=option_list)
 opt <- parse_args(option.parser, positional_arguments = TRUE)
-
-
-outFolder <- opt$outFolder
-
 data_list <- opt$args
+options <- opt$options
+
+outFolder <- options$outFolder
+chromo <- options$chromosome
+
+if(chromo == ""){chromo <- NA}
+
+message( " * chr is ", chromo )
+message(" * outFolder is", outFolder) 
 
 stopifnot( length( data_list) > 1 ) 
 
@@ -122,48 +128,46 @@ library(tidyverse)
 
 
 qtl_list <- purrr::map(data_list, pullData, type = "QTL" )
-outFolder <- "."
 
 prefix <- paste( data_list, collapse = "-" )
 
-outFile_final <- file.path(outFolder, paste0( prefix, ".metasoft.tsv" ) )
+outFile_final <- file.path(outFolder, paste0( prefix, ".metasoft.input.tsv" ) )
+# if chromosome is specified then just read in from that chromosome
+# else iterate through all
 
-chr_nums <- 1
+if( is.na(chromo) ){
+    chr_nums <- 1:22
+    chrs <- paste0("chr", chr_nums)
+}else{
+    chrs <- chromo
+}
 
-chrs <- paste0("chr", chr_nums)
+if( !dir.exists(outFolder) ){ dir.create(outFolder) }
 
-# iterate through chromosomes
 for( chr in chrs){
     message(" * merging data in ", chr )
-    outFile <- file.path( outFolder, paste0(prefix,".metasoft.", chr, ".tsv" ) )
+    outFile <- file.path( outFolder, paste0(prefix, ".", chr, ".pisquared.input.tsv.gz" ) )
     res <- purrr::map( qtl_list, ~{
         extractTargetQTL(.x, chr = chr)
     })  %>% 
     reduce( inner_join, by = "snp_gene"  )
+    
+    res <- res[ complete.cases(res),]     
+
     # give each column a unique name
-    data_names <- unlist(purrr::map( seq(length(data_list)), ~{ res <- paste( c("beta","se"), .x, sep = "."); return(res) }))
-    names(res) <- c("snp_gene", data_names)
- 
-    if( chr == "chr1"){
+    data_names <- unlist(purrr::map( data_list, ~{ res <- paste( c("pvalue"), .x, sep = "."); return(res) }))
+    colnames(res) <- c("snp_gene", data_names)
+    
+    print(head(res) )
+    print( names(res) )
+    message( " * writing to ", outFile )  
+    if( as.character(chr) == "1"){
         write_tsv( res, path = outFile, col_names = TRUE)
     }else{
-        write_tsv( res, path = outFile, col_names = TRUE)
+        write_tsv( res, path = outFile, col_names = FALSE)
     }
     rm(res)
     gc()
 }
-
-
-# use cat to concatenate together 
-message(" * concatenating to ", outFile_final)
-
-all_temp <- file.path( outFolder, paste0(prefix, ".metasoft.chr", chr_nums, ".tsv", collapse = " ") )
-cmd <- paste( "cat", all_temp, " > ", outFile_final)
-message( cmd )
-system(cmd)
-# remove temp files
-cmd <- paste( "rm ", all_temp)
-system(cmd)
-
 
 

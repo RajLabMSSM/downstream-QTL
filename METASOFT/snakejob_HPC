@@ -1,0 +1,10 @@
+script=snakejob
+
+while getopts 'c:s:m:inh' flag; do
+  case "${flag}" in
+    c) config="${OPTARG}" ;;
+  esac
+done
+
+
+bsub -P acc_als-omics -W 24:00 -n 1 -q premium -o cluster/snakejob_HPC.stdout -e cluster/snakejob_HPC.stderr -L /bin/bash  "sh $script -s Snakefile -c $config "

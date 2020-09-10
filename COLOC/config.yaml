@@ -9,7 +9,6 @@ gwas:
     - Marioni_2018
     - Jansen_2018
     - Kunkle_2019
-    #- Nicolas_2018_hg19
     - Nicolas_2018_hg38
 
 qtl:
@@ -25,7 +24,9 @@ qtl:
     - Microglia_all_regions_Young
     - Monocytes_Fairfax
     - Monocytes_MyND
+    - Monocytes_sQTL_MyND
     - DLPFC_ROSMAP
-
+    - Microglia_Young
+    - Microglia_all_regions_sQTL
 outFolder: "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
 
