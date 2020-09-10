@@ -59,7 +59,7 @@ splitCoords <- function(coords){
 
 pullData <- function(dataset, type = "GWAS"){
     message(Sys.time()," * selected dataset: ", dataset)
-    db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+    db_path <- "/sc/arion/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
 
     message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
@@ -164,7 +164,7 @@ matchMAF <- function(data, maf){
 # account for different GWAS having different column naming and ordering with a GWAS_config.yaml file
 # for each GWAS set the column numbers, the number of samples (N), the type of GWAS ("cc" or "quant") and the case proportion
 # and whether the GWAS was hg19 or hg38
-extractGWAS <- function(gwas, coord, refFolder = "/sc/hydra/projects/ad-omics/data/references/GWAS/", force_maf = TRUE){
+extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/data/references/GWAS/", force_maf = TRUE){
     # either read in config.yaml or Brian's CSV table
     gwas_path <- file.path( refFolder,  paste0(gwas$dataset, ".processed.tsv.gz" ))
     if( !file.exists(gwas_path) ){
@@ -589,7 +589,7 @@ library(GenomicRanges)
 library(rtracklayer)
 library(tidyverse)
 
-maf_1000gp1 <- "/sc/hydra/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
+maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
 maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
 
 # load in MAF table
@@ -598,7 +598,7 @@ if( !exists("maf_1000g")){
 
 maf_1000g <- loadMAF(maf_1000gp3)
 # load in liftover chain
-chain_hg19_hg38 <- import.chain("/sc/hydra/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
+chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
 
 }
 
