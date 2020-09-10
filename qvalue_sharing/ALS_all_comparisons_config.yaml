@@ -1,0 +1,34 @@
+sources:
+    - Frontal_Cortex_NYGC
+    - Cerebellum_NYGC
+    - Cervical_Spinal_Cord_NYGC
+    - Lumbar_Spinal_Cord_NYGC
+    - Lateral_Motor_Cortex_NYGC
+    - Medial_Motor_Cortex_NYGC
+    - Temporal_Cortex_NYGC
+
+targets:
+    - Frontal_Cortex_NYGC
+    - Cerebellum_NYGC
+    - Cervical_Spinal_Cord_NYGC
+    - Lumbar_Spinal_Cord_NYGC
+    - Lateral_Motor_Cortex_NYGC
+    - Medial_Motor_Cortex_NYGC
+    - Temporal_Cortex_NYGC
+    - DLPFC_ROSMAP
+    - GTEX_Brain_Amygdala
+    - GTEX_Brain_Anterior_cingulate_cortex_BA24
+    - GTEX_Brain_Caudate_basal_ganglia
+    - GTEX_Brain_Cerebellar_Hemisphere
+    - GTEX_Brain_Cerebellum
+    - GTEX_Brain_Cortex
+    - GTEX_Brain_Frontal_Cortex_BA9
+    - GTEX_Brain_Hippocampus
+    - GTEX_Brain_Hypothalamus
+    - GTEX_Brain_Nucleus_accumbens_basal_ganglia
+    - GTEX_Brain_Putamen_basal_ganglia
+    - GTEX_Brain_Spinal_cord_cervical_c-1
+    - GTEX_Brain_Substantia_nigra
+
+outFolder:
+    "qvalue_res/"
