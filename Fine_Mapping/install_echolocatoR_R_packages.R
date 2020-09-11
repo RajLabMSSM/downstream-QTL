@@ -7,7 +7,7 @@ message(" * installing R packages required for echolocatoR")
 
 # current CRAN version of foreign (dependency for ChIPQC) needs R >= 4.0 - so specify legacy version
 
-r_packages <- c("r.utils", "reticulate", "pbmcapply", "plotly","cowplot", "patchwork", "ggrepel", "curl", "gaston", "tidyverse", "BiocManager", "crayon", "roxygen2", "coloc", "haploR", "doBy")
+r_packages <- c("openxlsx", "R.utils", "reticulate", "pbmcapply", "plotly","cowplot", "patchwork", "ggrepel", "curl", "gaston", "tidyverse", "BiocManager", "crayon", "roxygen2", "coloc", "haploR", "doBy", "Ckmeans.1d.dp", "lifecycle")
 
 required_packages <- r_packages[ ! r_packages %in% installed.packages() ]
 
@@ -51,7 +51,7 @@ if( ! "refGenome" %in% installed.packages() ){
 # Bioconductor -------------------------------------
 
 library(BiocManager)
-bioc_packages <- c("supraHex", "graph", "Rgraphviz", "dnet", "GeneOverlap", "rtracklayer", "biomaRt", "Rsamtools", "snpStats", "bigsnpr", "ChIPQC")
+bioc_packages <- c("supraHex", "graph", "Rgraphviz", "dnet", "GeneOverlap", "rtracklayer", "biomaRt", "Rsamtools", "snpStats", "bigsnpr", "ChIPQC", "EnsDb.Hsapiens.v75", "ensembldb", "ggbio")
 
 
 # CHIPQC failing due to ERROR: dependency ‘foreign’ is not available for package ‘Hmisc’
