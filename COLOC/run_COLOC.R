@@ -491,7 +491,8 @@ runCOLOC <- function(gwas, qtl, hit){
         map_df( ~{ 
             as.data.frame(.x, stringsAsFactors=FALSE) %>% 
             arrange(pvalues) %>% head(1) %>% 
-            select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_MAF = MAF, QTL_chr, QTL_pos)
+            select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_SE = varbeta, QTL_MAF = MAF, QTL_chr, QTL_pos) %>%
+            mutate( QTL_SE = sqrt(QTL_SE) ) # get SE back from Variance
         }) 
     
     # actually run COLOC

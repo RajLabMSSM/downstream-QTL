@@ -155,6 +155,10 @@ all_loci_ld <- map2_df(.y = all_loci_split, .x= names(all_loci_split), ~{
     names(lead_gwas_ld) <- c("snp", "lead_gwas_ld")
 
     ld_res <- left_join(.y, lead_gwas_ld, by = "snp") %>% left_join(lead_qtl_ld, by = "snp")
+    
+    # the LD matrices store R, not R^2. So square them!
+    ld_res$lead_qtl_ld <- ld_res$lead_qtl_ld^2
+    ld_res$lead_gwas_ld <- ld_res$lead_gwas_ld^2
 
     return(ld_res)
 
