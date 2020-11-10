@@ -3,11 +3,13 @@ gwas_data = config["gwas"]
 qtl_data = config["qtl"]
 outFolder = config["outFolder"]
 
+shell.prefix("export PS1=""; ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate snakemake;")
 rule all:
     input:
-        outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz",
-        outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz",
-        expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
+        expand(outFolder + "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz", GWAS = gwas_data, QTL = qtl_data)
+        #outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz",
+        #outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz",
+        #expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
         #outFolder + "all_COLOC_summary_results.tsv.gz"
 
 rule run_COLOC:
@@ -15,7 +17,7 @@ rule run_COLOC:
         outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv",
         outFolder +  "{GWAS}/{QTL}_{GWAS}_COLOC.RData"
     params:
-        script = "run_COLOC.R"
+        script = "scripts/run_COLOC.R"
     shell:
         "mkdir -p {outFolder}{wildcards.GWAS};"
         "ml R/3.6.0; ml arrow;"
@@ -27,7 +29,7 @@ rule extract_COLOC_summary:
     output:
         outFolder +  "{GWAS}/{QTL}_{GWAS}_COLOC_summary_level.tsv"
     params:
-        script = "extract_COLOC_summary.R"
+        script = "scripts/extract_COLOC_summary.R"
     shell:
         "ml R/3.6.0;"
         "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -i {input} -o {output} "
@@ -38,10 +40,12 @@ rule merge_COLOC_snp_level:
     output:
         outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz",
         outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz"
+    params:
+        script = "scripts/merge_COLOC_results.R"
     shell:
         "ml R/3.6.0;"
-        "Rscript merge_COLOC_results.R --threshold 0 --inFolder {outFolder};" 
-        "Rscript merge_COLOC_results.R --threshold 0.5 --ld --inFolder {outFolder} "
+        "Rscript {params.script} --threshold 0 --inFolder {outFolder};" 
+        "Rscript {params.script} --threshold 0.5 --ld --inFolder {outFolder} "
 
 rule merge_COLOC_summary_level:
     input:
@@ -49,7 +53,19 @@ rule merge_COLOC_summary_level:
     output:
         outFolder + "all_COLOC_summary_results.tsv.gz"
     params:
-        script = "merge_COLOC_summary.R"
+        script = "scripts/merge_COLOC_summary.R"
     shell:
         "ml R/3.6.0;"
         "Rscript {params.script} --inFolder {outFolder}"
+
+rule create_LD_tables:
+    input:
+        outFolder +  "{GWAS}/{QTL}_{GWAS}_COLOC.RData"
+    output:
+        outFolder +  "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz"
+    params:
+        script = "scripts/prepare_gwas_qtls.R",
+        out = outFolder +  "{GWAS}/{QTL}/"
+    shell:
+       "conda activate echoR;"
+       "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} --inFile {input} --outFolder {params.out}" 
