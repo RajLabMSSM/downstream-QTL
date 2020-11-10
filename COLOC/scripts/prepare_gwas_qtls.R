@@ -193,7 +193,7 @@ all_loci_ld <- map2_df(.y = all_loci_split, .x= names(all_loci_split), ~{
     }else{
         ld_res$lead_gwas_snp <- NA
     }
-  e 
+   
     #ld_res <- left_join(.y, lead_gwas_ld, by = "snp") %>% left_join(lead_qtl_ld, by = "snp")
     
     # the LD matrices store R, not R^2. So square them!
