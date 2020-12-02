@@ -10,15 +10,15 @@
 # pull entry from GWAS/QTL DB
 pullData <- function(dataset, type = "QTL"){
     message(Sys.time()," * selected dataset: ", dataset)
-    db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+    db_path <- "/sc/arion/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
 
     message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
     if( type == "GWAS"){
-        n_sheet <- 2
+        n_sheet <- 3
     }
     if( type == "QTL"){
-        n_sheet <- 3
+        n_sheet <- 2
     }
     gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = n_sheet,na= c("", "-","NA")))
 
@@ -40,10 +40,11 @@ extractTargetQTL <- function(qtl, chr ){
     stopifnot( file.exists(qtl$full_path) )
 
     # check whether tabixed with "1" or "chr1"
-    if( qtl$full_chr_type == "1.0" | qtl$full_chr_type == 1  ){
+    stopifnot( qtl$full_chrom_type %in% c("1.0", 1, "chr1") )
+    if( qtl$full_chrom_type == "1.0" | qtl$full_chrom_type == 1  ){
         chr <- gsub("chr", "", chr)
     }
-    if( qtl$full_chr_type == "chr1"){
+    if( qtl$full_chrom_type == "chr1"){
         if( !grepl("chr", chr) ){
             chr <- paste0("chr", chr)
         }
@@ -60,17 +61,18 @@ extractTargetQTL <- function(qtl, chr ){
     result <- data.table::fread( cmd = cmd, nThread = 8 , fill = TRUE)
     message( " * QTL read in!" )
     if( nrow(result) == 0){
+        message(" * ...but the file is empty")
         return(NULL)
     }
     # rename columns 
-     stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_beta, qtl$full_se, qtl$full_maf, qtl$N, qtl$build) ) ))
+     stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$full_maf, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
-    betaCol <- qtl$full_beta
+    betaCol <- qtl$full_effect
     phenoCol <- qtl$full_pheno
     seCol <- qtl$full_se
     snpCol <- qtl$full_snp
     mafCol <- qtl$full_maf
-    if(is.null(result) ){ return(NULL) }
+    if(is.null(result) ){ message("* ..still empty"); return(NULL) }
 
     cmd <- paste( "zless ", qtl$full_path, " | head -1 " )
     columns <- colnames(data.table::fread( cmd = cmd, header= TRUE))
@@ -95,6 +97,8 @@ extractTargetQTL <- function(qtl, chr ){
     # merge SNP and pheno
     result$snp_gene <- paste0(result$snp ,"-", result$pheno)
     
+    print(head(result ) )
+
     # subset out just SNP-Gene pairs in source_qtls
     res_subset <- 
         result %>%

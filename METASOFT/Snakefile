@@ -37,8 +37,8 @@ rule runMETASOFT:
     input:  dataset_string + ".{chr}.metasoft.input.tsv"
     output: dataset_string + ".{chr}.metasoft.res.tsv"
     params:
-        jarfile = "/sc/hydra/projects/ad-omics/data/software/METASOFT/Metasoft.jar",
-        ptable = "/sc/hydra/projects/ad-omics/data/software/METASOFT/HanEskinPvalueTable.txt"
+        jarfile = "/sc/arion/projects/ad-omics/data/software/METASOFT/Metasoft.jar",
+        ptable = "/sc/arion/projects/ad-omics/data/software/METASOFT/HanEskinPvalueTable.txt"
     shell:
         "ml java; java -jar {params.jarfile} -pvalue_table {params.ptable} -input {input} -mvalue -mvalue_p_thres 1E-4 -output {output} -verbose"
 
@@ -65,6 +65,6 @@ rule mergeResults:
     shell:
         "ml bcftools/1.9;"
         "cat {input} | bgzip > {dataset_string}.metasoft.tabixed.tsv.gz;"
-        "tabix -s 28 -b 29 -e 29 -S 1 {dataset_string}.metasoft.tabixed.tsv.gz"     
+        "tabix -s 26 -b 27 -e 27 -S 1 {dataset_string}.metasoft.tabixed.tsv.gz"     
 
 

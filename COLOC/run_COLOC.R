@@ -110,7 +110,9 @@ extractLoci <- function(gwas){
     loci_df$snp <- loci_df[[gwas$top_snp]]
     loci_df$chr <- loci_df[[gwas$top_chrom]]
     loci_df$pos <- as.numeric(loci_df[[gwas$top_pos]])
-    
+
+    # remove "chr" from chr name if present
+    loci_df$chr <- gsub("chr", "", loci_df$chr) 
     # Ripke has 23 (chrX) in loci - remove 
     loci_df <- dplyr::filter(loci_df, chr %in% c(1:22) | chr %in% paste0("chr", 1:22) ) 
  
@@ -166,7 +168,8 @@ matchMAF <- function(data, maf){
 # and whether the GWAS was hg19 or hg38
 extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/data/references/GWAS/", force_maf = TRUE){
     # either read in config.yaml or Brian's CSV table
-    gwas_path <- file.path( refFolder,  paste0(gwas$dataset, ".processed.tsv.gz" ))
+    gwas_path <- gwas$full_processed_path
+    #gwas_path <- file.path( refFolder,  paste0(gwas$dataset, ".processed.tsv.gz" ))
     if( !file.exists(gwas_path) ){
         stop("ERROR - processed GWAS not found, make sure you ran process_GWAS.R first")
     }
