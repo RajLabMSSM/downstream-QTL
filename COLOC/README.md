@@ -72,33 +72,28 @@ This will create a set of individual tabixed chromosome files.
 
 
 
+**runCOLOC.R** - run COLOC on with the two P-value distributions
+
+```
+Usage: Rscript scripts/run_COLOC.R [options]
 
 
-**extractGWAS** - from a summary stat file, extract GWAS statistics within a coordinate range
+Options:
+    -o OUTFOLDER, --outFolder=OUTFOLDER
+        the path to the output file
 
-    input: tabix indexed GWAS file
+    -g GWAS, --gwas=GWAS
+        the dataset ID for a GWAS in the GWAS/QTL database
 
-    output: list of P-values and coordinates
+    -q QTL, --qtl=QTL
+        the dataset ID for a QTL dataset in the GWAS/QTL database
 
-    parameters: which column is P-value (default to EBI GWAS catalogue)
+    --debug
+        load all files and the nsave RData without running COLOC
 
-
-**extractNominalQTLs** - from a set of parquet files, extract QTL statistics within a coordinate range
-
-    input: folder containing per-chromosome parquet files containing nominal QTL results
-
-    output: list of P-values and coordinates
-
-    parameters: which column is p-value (default should be the same except when using interaction results)
-
-
-**runCOLOC** - run COLOC on with the two P-value distributions
-
-    input: 2 lists of P-values and coords, one from GWAS and one from QTL
-
-    output: summary of COLOC results
-
-    parameters: ???
+    -h, --help
+        Show this help message and exit
+```
 
 
 ## Putting steps together
