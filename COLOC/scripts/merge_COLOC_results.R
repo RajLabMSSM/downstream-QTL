@@ -33,7 +33,7 @@ outFile <- paste0(inFolder, "all_COLOC_results_merged_H4_", H4_threshold, LD_str
 
 message(" * writing to ", outFile)
 
-#inFolder <- "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
+#inFolder <- "/sc/arion/projects/ad-omics/microglia_omics/COLOC/"
 #H4_threshold <- 0.5
 #calculate_LD <- TRUE
 #H4_threshold <- 0
@@ -92,7 +92,7 @@ all_res$geneid <- str_split_fixed(all_res$geneid, "\\.", 2)[,1]
 all_res$QTL_junction <- map_chr(str_split(all_res$gene, ":"), ~{ paste0(.x[1], ":", .x[2], "-", .x[3])  })
 
 
-gene_meta <- read_tsv("/sc/hydra/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>% 
+gene_meta <- read_tsv("/sc/arion/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>% 
     janitor::clean_names() %>%
     select(genename, geneid) %>% distinct()
 

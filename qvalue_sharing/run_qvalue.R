@@ -6,15 +6,15 @@
 # get QTL metadata for source (top QTLs) and target (all QTLs) from database
 pullData <- function(dataset, type = "GWAS"){
     message(Sys.time()," * selected dataset: ", dataset)
-    db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+    db_path <- "/sc/arion/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
 
     message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
     if( type == "GWAS"){
-        n_sheet <- 2
+        n_sheet <- 3
     }
     if( type == "QTL"){
-        n_sheet <- 3
+        n_sheet <- 2
     }
     gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = n_sheet,na= c("", "-","NA")))
     
@@ -32,6 +32,7 @@ pullData <- function(dataset, type = "GWAS"){
 # read in top permutation QTL results
 extractTopQTL <- function(qtl, qvalue_threshold){
     loci_path <- qtl$top_path
+    stopifnot(!is.na(qtl$top_path) )
     # loci are stored either in comma-separated (csv), tab-separated files (txt, tsv) or in excel files (xlsx, xlsm)
     # read in loci file depending on file type
     message(" * reading in top QTLs from ", loci_path)
@@ -60,7 +61,9 @@ extractTopQTL <- function(qtl, qvalue_threshold){
     loci_df <- dplyr::filter(loci_df, qval < qvalue_threshold )
      
     # if sQTL then process the sQTL phenotype     
- 
+    if(qtl$phenotype == "sQTL"){
+        loci_df$pheno <- gsub("clu_[0-9]+_", "", loci_df$pheno )
+    } 
     loci_clean <- dplyr::select(loci_df, snp, pheno, pval, qval)
     # same for beta and MAF?
     return(loci_clean)
@@ -80,9 +83,9 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
     }
 
     # rename columns 
-     stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_beta, qtl$full_se, qtl$full_maf, qtl$N, qtl$build) ) ))
+    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$full_maf, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
-    betaCol <- qtl$full_beta
+    betaCol <- qtl$full_effect
     phenoCol <- qtl$full_pheno
     seCol <- qtl$full_se
     snpCol <- qtl$full_snp
@@ -105,8 +108,11 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
    
     # adjust EnsemblID - remove tag number
     result$pheno <- stringr::str_split_fixed(result$pheno, "\\.", 2)[,1]
+    
+    if(qtl$phenotype == "sQTL"){
+        result$pheno <- gsub("clu_[0-9]+_", "", result$pheno )
+    }
 
- 
     # subset out just SNP-Gene pairs in source_qtls
     res_subset <- dplyr::filter(result, pheno %in% source_qtls$pheno & snp %in% source_qtls$snp ) %>%
         select( pheno, snp, pvalue_target = pvalue)
@@ -187,11 +193,14 @@ qtl_target <- pullData(targetName, type = "QTL")
 # get source permutation QTLs (top QTLs)
 source_top_res <- extractTopQTL(qtl_source,qvalue_threshold = threshold)
 
-if( qtl_target$full_chr_type == "chr1" ){
+if( qtl_target$full_chrom_type == "chr1" ){
     chroms <- paste0("chr", seq(1,22) ) 
 }else{ 
     chroms <- 1:22
 }
+
+# TESTING - just run one chromosome
+# chroms <- "chr22"
 
 # iterate through chromosomes to get nominal results in target QTLs
 target_res <- purrr::map_df( chroms, ~{extractTargetQTL(qtl_target, .x, source_top_res) })
