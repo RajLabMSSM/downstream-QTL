@@ -10,37 +10,48 @@
 
 datasets = config["datasets"]
 
-dataset_string = "-".join(datasets)
+prefix = "-".join(datasets)
 
 outFolder = config["outFolder"]
 
-dataset_string = outFolder + dataset_string
+dataset_string = outFolder + prefix
 
 chromosomes = list(range(1,23))
 vcf = config["vcf"]
 
 rule all:
     input:
-        dataset_string + ".metasoft.tabixed.tsv.gz.tbi"
+        expand(dataset_string + ".{tool}.tabixed.tsv.gz.tbi", tool = ["metasoft", "re2c"])
 
 rule createInputFiles:
     output:
-       dataset_string + ".{chr}.metasoft.input.tsv"
+       dataset_string + ".{chr}.input.tsv"
     params:
         dataset_args = " ".join(datasets)
     shell:
         "ml R/3.6.0;"
-        "Rscript createMetaInputByChr.R -c {wildcards.chr} -o {outFolder} {params.dataset_args} "
+        "Rscript scripts/createMetaInputByChr.R -c {wildcards.chr} -o {outFolder} {params.dataset_args} "
 
 
 rule runMETASOFT:
-    input:  dataset_string + ".{chr}.metasoft.input.tsv"
-    output: dataset_string + ".{chr}.metasoft.res.tsv"
+    input:  dataset_string + ".{chr}.input.tsv"
+    output: outFolder + "/METASOFT/" + prefix + ".{chr}.metasoft.res.tsv"
     params:
         jarfile = "/sc/arion/projects/ad-omics/data/software/METASOFT/Metasoft.jar",
-        ptable = "/sc/arion/projects/ad-omics/data/software/METASOFT/HanEskinPvalueTable.txt"
+        ptable = "/sc/arion/projects/ad-omics/data/software/METASOFT/HanEskinPvalueTable.txt",
+        logfile = outFolder + "/METASOFT/" + prefix + ".{chr}.metasoft.log.txt" 
     shell:
-        "ml java; java -jar {params.jarfile} -pvalue_table {params.ptable} -input {input} -mvalue -mvalue_p_thres 1E-4 -output {output} -verbose"
+        "ml java; java -jar {params.jarfile} -pvalue_table {params.ptable} -input {input} -mvalue -mvalue_p_thres 1E-4 -output {output} -log {params.logfile} -verbose"
+
+rule runRE2C:
+    input: dataset_string + ".{chr}.input.tsv"
+    output: dataset_string + ".{chr}.re2c.res.tsv"
+    params:
+        re2c = "/sc/arion/projects/ad-omics/data/software/RE2Cv1_04/RE2C.sh"
+    shell:
+        "ml R/3.6.0;"
+        "sh {params.re2c} --input {input} --output {output}; "
+        "mv {output}.txt {output}" # RE2C appends .txt to end of output - remove it
 
 rule processVCF:
     input: vcf
@@ -51,20 +62,22 @@ rule processVCF:
 # split phenotype from SNP, add coords from VCF
 rule formatResults:
     input: 
-        res = dataset_string + ".{chr}.metasoft.res.tsv",
+        res = dataset_string + ".{chr}.{tool}.res.tsv",
         vcf_df = outFolder + "vcf.processed.txt"
-    output:  dataset_string + ".{chr}.metasoft.res.formatted.tsv",
+    output:  dataset_string + ".{chr}.{tool}.formatted.tsv",
     shell:
         "ml R/3.6.0;"
-        "Rscript formatMETASOFT.R -c {wildcards.chr} -i {input.res} -o {output} -v {input.vcf_df} "
+        "Rscript scripts/formatMETASOFT.R -c {wildcards.chr} -i {input.res} -o {output} -v {input.vcf_df} "
 
 # merge together and tabix
 rule mergeResults:
-    input: expand( dataset_string + ".{chr}.metasoft.res.formatted.tsv", chr = chromosomes )
-    output: dataset_string + ".metasoft.tabixed.tsv.gz.tbi"
+    input: expand( dataset_string + ".{chr}.{tool}.formatted.tsv", chr = chromosomes,allow_missing=True )
+    output: 
+        gzip = dataset_string + ".{tool}.tabixed.tsv.gz",
+        tbi = dataset_string + ".{tool}.tabixed.tsv.gz.tbi"
     shell:
         "ml bcftools/1.9;"
-        "cat {input} | bgzip > {dataset_string}.metasoft.tabixed.tsv.gz;"
-        "tabix -s 26 -b 27 -e 27 -S 1 {dataset_string}.metasoft.tabixed.tsv.gz"     
+        "cat {input} | bgzip > {output.gzip};"
+        "tabix -s 2 -b 3 -e 3 -S 1 {output.gzip}"     
 
 

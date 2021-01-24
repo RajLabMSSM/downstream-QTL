@@ -6,9 +6,9 @@ outFolder = config["outFolder"]
 shell.prefix("export PS1=""; ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate snakemake;")
 rule all:
     input:
-        expand(outFolder + "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz", GWAS = gwas_data, QTL = qtl_data)
-        #outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz",
-        #outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz",
+        #expand(outFolder + "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz", GWAS = gwas_data, QTL = qtl_data)
+        outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz",
+        outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz",
         #expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
         #outFolder + "all_COLOC_summary_results.tsv.gz"
 

@@ -18,12 +18,15 @@
 # run COLOC to get different colocalisations
 # extract top QTL SNP for locus
 # record results in table - GWAS locus, Gene, top QTL SNP, COLOC probabilities
-library(purrr)
-library(readr)
-library(dplyr)
-library(stringr)
-library(coloc)
-library(optparse)
+suppressPackageStartupMessages(library(tidyverse))
+
+suppressPackageStartupMessages(library(coloc))
+suppressPackageStartupMessages(library(optparse))
+
+suppressPackageStartupMessages(library(GenomicRanges))
+suppressPackageStartupMessages(library(rtracklayer))
+
+
 #library(arrow)
 
 # flank coordinates by set number of bases (default 1MB)
@@ -350,9 +353,9 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     
 
     # check columns
-    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$N, qtl$build) ) ))
+    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
-    betaCol <- qtl$full_effect
+    betaCol <- qtl$full_effect # if not present will be set to NA
     phenoCol <- qtl$full_pheno
     seCol <- qtl$full_se
     snpCol <- qtl$full_snp
@@ -377,8 +380,17 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     names(result)[names(col_dict) == phenoCol] <- "gene"
     names(result)[names(col_dict) == mafCol]   <- "MAF"
     names(result)[names(col_dict) == pvalCol]  <- "pvalues"
-    names(result)[names(col_dict) == betaCol]  <- "beta"
-    names(result)[names(col_dict) == seCol]    <- "varbeta"
+    if( !is.na(betaCol) ){
+        names(result)[names(col_dict) == betaCol]  <- "beta"
+    }
+    if( !is.na(seCol) ){
+        names(result)[names(col_dict) == seCol]    <- "varbeta"
+        # don't forget to square the standard error to get the variance             
+        result$varbeta <- result$varbeta^2
+ 
+        # remove rows with variance of 0 - this will corrupt COLOC
+        result <- dplyr::filter(result, varbeta != 0) 
+    }
     names(result)[names(col_dict) == snpCol]   <- "snp"
     # Young microglia use log10P - convert
     if( pvalCol == "log10_p"){
@@ -410,16 +422,14 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
 
     #print(head(result) ) 
     
-    # don't forget to square the standard error to get the variance             
-    result$varbeta <- result$varbeta^2
- 
-    # remove rows with variance of 0 - this will corrupt COLOC
-    result <- dplyr::filter(result, varbeta != 0) 
-
     # retain only associations within locus coords
-    res_subset <- dplyr::select(result, gene, snp, pvalues, beta, varbeta, MAF, QTL_chr, QTL_pos) #%>%
-        #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
-
+    if( !is.na(betaCol) & !is.na(seCol) ){
+        res_subset <- dplyr::select(result, gene, snp, pvalues, beta, varbeta, MAF, QTL_chr, QTL_pos)
+    }else{
+        res_subset <- dplyr::select(result, gene, snp, pvalues, MAF, QTL_chr, QTL_pos)
+    }
+    #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
+       
     # split by gene, convert to list object
     res_split <- 
         split(res_subset, res_subset$gene) %>%
@@ -489,17 +499,27 @@ runCOLOC <- function(gwas, qtl, hit){
     message("       * extracting QTLs")
     q <- extractQTL(qtl, qtl_range)
     if( is.null(q) ){ return(NULL) }
-    # for each gene extract top QTL SNP    
-    qtl_info <- q %>% 
+    # for each gene extract top QTL SNP   
+    if( all( c("beta", "varbeta") %in% names(q) ) ){
+        qtl_info <- q %>% 
         map_df( ~{ 
             as.data.frame(.x, stringsAsFactors=FALSE) %>% 
             arrange(pvalues) %>% head(1) %>% 
             select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_SE = varbeta, QTL_MAF = MAF, QTL_chr, QTL_pos) %>%
             mutate( QTL_SE = sqrt(QTL_SE) ) # get SE back from Variance
         }) 
-    
+    }else{
+        qtl_info <- q %>% 
+        map_df( ~{ 
+            as.data.frame(.x, stringsAsFactors=FALSE) %>% 
+            arrange(pvalues) %>% head(1) %>% 
+            select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_MAF = MAF, QTL_chr, QTL_pos)
+        }) 
+
+    }
     # actually run COLOC
-        message("      * running COLOC")
+    message("      * running COLOC")
+    
     # run COLOC on each QTL gene 
     # return the results table and an object containing g and q
     coloc_res <- 
@@ -588,11 +608,6 @@ debug <- opt$debug
 # load in data
 # extract top GWAS loci
 # for each locus run COLOC
-
-library(GenomicRanges)
-library(rtracklayer)
-library(tidyverse)
-
 maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
 maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
 

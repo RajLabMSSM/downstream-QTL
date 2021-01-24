@@ -1,8 +1,8 @@
 __default__:
   #partition: chimera
-  queue: express
+  queue: premium
   cores: 8
-  mem: 3750
+  mem: 3000
   time: '720'
   name: $(basename $(pwd)):{rule}:{wildcards}
   output: logs/{rule}:{wildcards}.stdout
