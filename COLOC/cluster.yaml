@@ -1,7 +1,7 @@
 __default__:
   #partition: chimera
-  queue: express
-  cores: 8
+  queue: premium
+  cores: 2
   mem: 3750
   time: '120'
   name: $(basename $(pwd)):{rule}:{wildcards}

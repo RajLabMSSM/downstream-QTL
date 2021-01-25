@@ -35,11 +35,11 @@ rule createInputFiles:
 
 rule runMETASOFT:
     input:  dataset_string + ".{chr}.input.tsv"
-    output: outFolder + "/METASOFT/" + prefix + ".{chr}.metasoft.res.tsv"
+    output: dataset_string + ".{chr}.metasoft.res.tsv"
     params:
         jarfile = "/sc/arion/projects/ad-omics/data/software/METASOFT/Metasoft.jar",
         ptable = "/sc/arion/projects/ad-omics/data/software/METASOFT/HanEskinPvalueTable.txt",
-        logfile = outFolder + "/METASOFT/" + prefix + ".{chr}.metasoft.log.txt" 
+        logfile = dataset_string + ".{chr}.metasoft.log.txt" 
     shell:
         "ml java; java -jar {params.jarfile} -pvalue_table {params.ptable} -input {input} -mvalue -mvalue_p_thres 1E-4 -output {output} -log {params.logfile} -verbose"
 
