@@ -53,6 +53,17 @@ rule runRE2C:
         "sh {params.re2c} --input {input} --output {output}; "
         "mv {output}.txt {output}" # RE2C appends .txt to end of output - remove it
 
+rule runRECOV:
+    input: dataset_string + ".{chr}.input.tsv"
+    output: dataset_string + ".{chr}.recov.res.tsv"
+    params:
+        RECOV = "/sc/arion/projects/ad-omics/data/software/RECOV/fitLlh1Gene4github.R",
+        logfile = dataset_string + ".{chr}.recov.log.txt"
+    shell:
+        "ml R/3.6.0;"
+        #"Rscript {params.RECOV} {input} {output}" 
+        "R CMD BATCH --no-save --no-restore \"--args {input} {output} 10 \" {params.RECOV} {params.logfile}"
+
 rule processVCF:
     input: vcf
     output: outFolder + "vcf.processed.txt"
