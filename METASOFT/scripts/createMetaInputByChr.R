@@ -66,7 +66,7 @@ extractTargetQTL <- function(qtl, chr ){
         return(NULL)
     }
     # rename columns 
-     stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$N, qtl$build) ) ))
+    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
     betaCol <- qtl$full_effect
     phenoCol <- qtl$full_pheno
@@ -88,7 +88,10 @@ extractTargetQTL <- function(qtl, chr ){
     result$se[ is.nan(result$se) | result$se == 0] <- NA
     result$beta[ is.nan(result$beta) | result$beta == 0] <- NA
     # RE2C fails when NAs are present so remove any rows (associations) with missing data.
-    result <- result[ complete.cases(result),] 
+    result <- result[, c("snp", "pheno", "beta", "se", "pvalue") ]
+    result <- result[ complete.cases(result),]
+    stopifnot( nrow(result) > 0 )
+    
     # weird exception - Young Microglia stores p-values as log10 - convert
     if( qtl$full_p == "log10_p"){
         result$pvalue <- 10^result$pvalue
