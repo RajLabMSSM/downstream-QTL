@@ -84,9 +84,10 @@ extractTargetQTL <- function(qtl, chr ){
     names(result)[names(col_dict) == snpCol]   <- "snp"
     names(result)[names(col_dict) == betaCol]   <- "beta"
     names(result)[names(col_dict) == seCol]   <- "se"
-    # NaN values in SE sometimes?
-    result$se[ is.nan(result$se) | result$se == 0] <- NA
-    result$beta[ is.nan(result$beta) | result$beta == 0] <- NA
+    # NaN values in SE sometimes? Infinite values?
+    result$se[ is.nan(result$se) | result$se == 0 | is.infinite(result$se) ] <- NA
+    result$beta[ is.nan(result$beta) | result$beta == 0 | is.infinite(result$beta) ] <- NA
+
     # RE2C fails when NAs are present so remove any rows (associations) with missing data.
     result <- result[, c("snp", "pheno", "beta", "se", "pvalue") ]
     result <- result[ complete.cases(result),]
