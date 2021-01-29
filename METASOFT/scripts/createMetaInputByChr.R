@@ -54,7 +54,7 @@ extractTargetQTL <- function(qtl, chr ){
     # read in QTL
     # use dark awk magic to remove the clusterID while reading in
     if( qtl$phenotype == "sQTL" ){
-        cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr, ' | awk \'{gsub(/clu_[0-9]+_[+-]:/, ""); print }\' ')
+        cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr, ' | awk \'BEGIN{OFS="\t"}{split($1, a, ":"); $1 = a[1]":"a[2]":"a[3]":"a[5];print }\' ')
     }else{
         cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr)
     }
@@ -163,7 +163,10 @@ for( chr in chrs){
     res <- purrr::map( qtl_list, ~{
         extractTargetQTL(.x, chr = chr)
     })  %>% 
-    reduce( inner_join, by = "snp_gene"  )
+    reduce( inner_join, by = "snp_gene"  ) 
+    
+    stopifnot( nrow(res) > 0 )
+    print(head(res) )
 
     # give each column a unique name
     data_names <- unlist(purrr::map( seq(length(data_list)), ~{ res <- paste( c("beta","se"), .x, sep = "."); return(res) }))
