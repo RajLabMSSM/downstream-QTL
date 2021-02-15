@@ -77,6 +77,7 @@ tribble(
     "Jansen_2018",  "AD",
     "Kunkle_2019",  "AD",
     "Nicolas_2018", "ALS",
+    "NicolasSuggestive_2018", "ALS"
 )
 
 all_res <- left_join(all_res, gwas_key, by = "GWAS")
