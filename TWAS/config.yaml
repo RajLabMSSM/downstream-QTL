@@ -7,3 +7,7 @@ weight_files:
     - "CMC.BRAIN.RNASEQ_SPLICING"
     - "Brain_Cerebellum"
     - "Brain_Spinal_cord_cervical_c-1"
+    - "YFS.BLOOD.RNAARR"
+    - "Nerve_Tibial"
+    - "Brain_Cortex"
+    - "AMPAD_TWAS"
