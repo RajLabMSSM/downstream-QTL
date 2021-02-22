@@ -1,13 +1,3 @@
 data_code: "Nicolas_ALS"
 sumstat_file: "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/nicolas_hg38_gwas_munged.sumstats.gz"
-
-weight_files:
-    - "GTEx.Whole_Blood"
-    - "CMC.BRAIN.RNASEQ"
-    - "CMC.BRAIN.RNASEQ_SPLICING"
-    - "Brain_Cerebellum"
-    - "Brain_Spinal_cord_cervical_c-1"
-    - "YFS.BLOOD.RNAARR"
-    - "Nerve_Tibial"
-    - "Brain_Cortex"
-    - "AMPAD_TWAS"
+weight_files: "NYGC_weight_files.csv"

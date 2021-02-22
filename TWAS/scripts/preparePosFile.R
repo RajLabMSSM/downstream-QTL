@@ -10,6 +10,8 @@ p <- add_argument(p, "--prefix", help="RDat file prefix", nargs=1)
 p <- add_argument(p, "--list", help="List file", nargs=1)  
 p <- add_argument(p, "--output", help="Output name for the pos file", nargs=1)  
 
+script <- "scripts/preparePosFile.sh"
+
 arg <- parse_args(p)
 
 phenotype <- arg$phenotype
@@ -20,7 +22,7 @@ listname <- arg$list
 
 output <- arg$output
 
-system(paste0(("bash preparePosFile.sh "),phenotype,(" "),prefix))
+system(paste0("bash ", script,phenotype, " " ,prefix))
 
 guide <- fread(paste0(prefix,(".all_possible_WGT_GNAME_CHR_P0_P1.tsv")),header=FALSE)
 

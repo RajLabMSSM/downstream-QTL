@@ -22,4 +22,7 @@ transposed <- df %>%
     select(FID, IID, everything() ) %>% 
     select(-name)
 
+# remove any spaces in covariate names
+names(transposed) <- gsub(" ", "_", names(transposed) )
+
 write_tsv(transposed, path = output)
