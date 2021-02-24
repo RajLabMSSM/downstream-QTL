@@ -1,10 +1,17 @@
 
 # downstream-QTL
 
-Functions for dealing with QTL results
+Functions for dealing with QTL results.
 
-* COLOC with GWAS results
+Written by Jack Humphrey and Katia de Paiva Lopes
+Raj Lab 2020
 
-* pairwise sharing between QTLs
+* Colocalisation with GWAS results (coloc)
 
-* MASHR
+* Pairwise sharing between QTLs (qvalue, pisquared)
+
+* Random-effects meta-analysis of multiple QTL datasets (METASOFT, RE2C)
+
+* Multivariate adaptive shrinkage for sharing of effect sizes between QTL datasets (MASHR)
+
+* Building Transcriptome-wide Association Study (TWAS) models and applying them to GWAS (FUSION) - under construction
