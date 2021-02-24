@@ -1,0 +1,184 @@
+---
+title: "mashR"
+subtitle: "Multivariate adaptive shrinkage using R"
+author: |
+ | Katia de Paiva Lopes
+ | Ricardo Assunção Vialle 
+ | Raj Lab
+ | Department of Neuroscience
+ | Icahn School of Medicine at Mount Sinai
+ | NYC, New York
+date: "`r Sys.Date()`"
+output:
+ rmarkdown::html_document:
+   theme: spacelab
+   highlight: zenburn
+   code_folding: show
+   toc: true
+   toc_float: true
+   smooth_scroll: true
+   number_sections: false
+self_contained: true
+---
+
+> Make sure that your data have enough overlap across conditions. This tool need a strong subset to learn from the data. 
+
+```{r clean.variables, echo=FALSE}
+#This command clean all variables. BE CAREFULL!!! 
+rm(list = setdiff(ls(), lsf.str()))
+```
+
+```{r load.packages, echo=FALSE, message=FALSE, results='hide'}
+
+# install.packages("devtools")
+# devtools::install_github("stephenslab/mashr@v0.2-11")
+# 
+# devtools::install_github("stephens999/ashr")
+library(mashr)
+```
+
+```{r Helper Functions, echo=FALSE}
+createDT <- function(DF, caption="", scrollY=500){
+  data <- DT::datatable(DF, caption=caption,
+    extensions =  'Buttons',
+    options = list( dom = 'Bfrtip', 
+                    buttons = c('copy', 'csv', 'excel', 'pdf', 'print'), 
+                    scrollY = scrollY, scrollX=T, scrollCollapse = T, paging = F,  
+                      columnDefs = list(list(className = 'dt-center', targets = "_all"))
+    )
+  ) 
+   return(data)
+}
+ 
+```
+
+### Data input 
+
+```{r input.data, echo=TRUE}
+
+readFastQTL_permResults <- function(file){
+  f1 = read.table(gzfile(file), header = F, 
+                  col.names = c("pid", "nvar", "shape1", "shape2", "dummy", "sid", "dist", "npval", "slope", "ppval", "bpval"))
+  slope = f1$slope
+  pvalue = f1$npval
+  degree_freedom = 2
+  t_val <- qt(pvalue/2, df = degree_freedom) # Calculating the t-value using quantile function
+  standard_error = slope/abs(t_val) # Calculating standard error
+  f1$standard_error = standard_error
+  f1$eqtl = paste0(f1$pid,"_",f1$sid)
+  f1 = f1[,c("eqtl","pid", "nvar", "shape1", "shape2", "dummy", "sid", "dist", "npval", "slope", "ppval", "bpval","standard_error")]
+  return(f1)
+}
+
+f1 = readFastQTL_permResults("/hpc/users/viallr01/ad-omics/ricardo/AMP_AD/MSBB/BM10_SVeQTL/FinalResults_fastQTL.gz")
+f2 = readFastQTL_permResults("/hpc/users/viallr01/ad-omics/ricardo/AMP_AD/MSBB/BM22_SVeQTL/FinalResults_fastQTL.gz")
+f3 = readFastQTL_permResults("/hpc/users/viallr01/ad-omics/ricardo/AMP_AD/MSBB/BM36_SVeQTL/FinalResults_fastQTL.gz")
+f4 = readFastQTL_permResults("/hpc/users/viallr01/ad-omics/ricardo/AMP_AD/MSBB/BM44_SVeQTL/FinalResults_fastQTL.gz")
+```
+
+### Slope matrix 
+
+```{r slope.matrix, echo=TRUE}
+m_slope = merge(f1[,c("eqtl","slope")],
+                f2[,c("eqtl","slope")],
+                by="eqtl")
+colnames(m_slope) = c("eqtl","Tissue1","Tissue2")
+m_slope = merge(m_slope,
+                f3[,c("eqtl","slope")],
+                by="eqtl")
+colnames(m_slope) = c("eqtl","Tissue1","Tissue2","Tissue3")
+m_slope = merge(m_slope,
+                f4[,c("eqtl","slope")],
+                by="eqtl")
+colnames(m_slope) = c("eqtl","Tissue1","Tissue2","Tissue3","Tissue4")
+rownames(m_slope) = m_slope$eqtl
+m_slope = m_slope[,-1]
+
+m_slope = m_slope[rowSums(is.na(m_slope))==0,]
+createDT(m_slope)
+```
+
+### SE matrix
+
+```{r se.matrix, echo=TRUE}
+m_se = matrix(data = 1, nrow = nrow(m_slope), ncol = ncol(m_slope))
+colnames(m_se) = colnames(m_slope)
+rownames(m_se) = rownames(m_slope)
+
+#m_se = merge(f1[,c("eqtl","standard_error")],
+#                f2[,c("eqtl","standard_error")],
+#                by="eqtl")
+#colnames(m_se) = c("eqtl","Tissue1","Tissue2")
+#m_se = merge(m_se,
+#                f3[,c("eqtl","standard_error")],
+#                by="eqtl")
+#colnames(m_se) = c("eqtl","Tissue1","Tissue2","Tissue3")
+#m_se = merge(m_se,
+#                f4[,c("eqtl","standard_error")],
+#                by="eqtl")
+#colnames(m_se) = c("eqtl","Tissue1","Tissue2","Tissue3","Tissue4")
+#rownames(m_se) = m_se$eqtl
+#m_se = m_se[,-1]
+#head(m_se)
+
+m_slope = data.matrix(m_slope)
+m_se = abs(data.matrix(m_se)) #absolute number to remove negative signals if necessary
+createDT(m_se)
+```
+
+### Subsets 
+
+```{r m.subsets, echo=TRUE}
+m_list = list()
+m_list$Bhat = m_slope
+m_list$Shat = m_se #absolute number to remove negative signals if necessary 
+
+m_data = mash_set_data(m_list$Bhat, m_list$Shat)
+
+#1 - identify a subset of strong tests
+m.1by1 = mash_1by1(m_data) 
+strong.subset = get_significant_results(m.1by1,0.5) #1st approach get significant eQTLs - 0.5
+
+# identify a random subset of 500 tests
+random.subset = sample(1:nrow(m_data$Bhat),500, replace = F) #2nd approach
+
+# Correlation structure 
+data.temp = mash_set_data(m_slope[random.subset,],m_se[random.subset,])
+Vhat = estimate_null_correlation_simple(data.temp)
+rm(data.temp)
+
+#Now we can set up our main data objects with this correlation structure in place:
+data.random = mash_set_data(m_slope[random.subset,],m_se[random.subset,],V=Vhat)
+data.strong = mash_set_data(m_slope[strong.subset,],m_se[strong.subset,], V=Vhat)
+```
+
+### Covariances 
+
+```{r driven.covariances, echo=TRUE}
+# Data driven covariances 
+# Now we use the strong tests to set up data-driven covariances
+U.pca = cov_pca(data.strong,3)
+U.ed = cov_ed(data.strong, U.pca) # Err in extreme deconvolution 
+
+U.c = cov_canonical(data.random)
+m = mash(data.random, Ulist = c(U.ed,U.c), outputlevel = 1)
+```
+
+```{r summaries.barplot, echo=TRUE}
+# Compute posterior summaries
+m2 = mash(data.strong, g=get_fitted_g(m), fixg=TRUE) 
+barplot(get_estimated_pi(m2),las = 2, cex.axis = 0.8, cex.names = 0.8)
+```
+
+### Metaplot 
+
+```{r summaries.metaplot, echo=TRUE }
+mash_plot_meta(m2, get_significant_results(m2)[1])
+```
+
+```{r session, echo=TRUE}
+sessionInfo()
+```
+
+
+
