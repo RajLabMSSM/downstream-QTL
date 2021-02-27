@@ -9,6 +9,7 @@ option_list <- list(
     make_option(c('-o', '--out_prefix' ), help = "the full path to the output file for writing to", default = ""),
     make_option(c('-n', '--n_chunk' ), help = "the number of chunks to split file by", default = 100),
     make_option(c('-m', '--mode' ), help = "whether eQTLs or sQTLs are present", default = "eQTL"),
+    make_option(c('-c', '--chr_type'), help = "whether chromosome should be chr1 or 1", default = "chr1"),
     make_option(c('-l', '--liftover' ), help = "whether to lift over coordinates from hg38 to hg19", default = FALSE, action = "store_true")
 )
 
@@ -20,6 +21,7 @@ out_prefix <- opt$out_prefix
 mode <- opt$mode
 liftover <- opt$liftover
 n_chunk <- opt$n_chunk
+chr_type <- opt$chr_type
 
 liftOverCoord <- function(df, from = "hg38", to = "hg19"){
     if( from == "hg38" & to == "hg19" ){
@@ -71,7 +73,9 @@ liftOverCoord <- function(df, from = "hg38", to = "hg19"){
 df <- read_tsv(input)
 
 # remove "chr" from chromosomes
-df[[1]] <- gsub("chr", "", df[[1]])
+if( chr_type != "chr1" ){
+    df[[1]] <- gsub("chr", "", df[[1]])
+}
 
 if( mode == "sQTL"){
     df[[4]] <- gsub(":clu_[0-9]+_[+-]", "", df[[4]])

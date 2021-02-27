@@ -28,7 +28,7 @@ n_sample = config["n_sample"]
 pheno_df = config["pheno_df"]
 cov_df = config["cov_df"]
 out_folder = config["out_folder"]
-
+chr_type = "chr1"
 
 # hardcoded inputs
 # LD reference - from FUSION
@@ -38,7 +38,15 @@ n_chunk = 100
 
 CHUNKS = range(1,n_chunk + 1)
 fusion_dir = "/sc/arion/projects/ad-omics/data/software/fusion_twas-master/"
+
+# hg19
 ld_ref = fusion_dir + "LDREF"
+ld_prefix = "1000G.EUR."
+
+# hg38 - from Fahri
+ld_ref = fusion_dir + "LDREF_hg38"
+ld_prefix = "hwe1e6.1000G.EURn404.GRCh38_fk.chr"
+
 
 prefix = out_folder + data_code
 
@@ -58,7 +66,7 @@ rule split_pheno:
         script = "scripts/split_pheno.R"
     shell:
         "ml R/3.6.0;"
-        "Rscript {params.script} -i {input} -o {params.out_prefix} -n {n_chunk} -m {mode}"
+        "Rscript {params.script} -i {input} -o {params.out_prefix} -n {n_chunk} -m {mode} -c {chr_type}"
 
 
 # transpose covariates
@@ -81,7 +89,7 @@ rule split_vcf:
         expand( prefix + "/geno/" + data_code + ".{CHR}.bed", CHR = range(1,23) )
     run:
         for chromo in range(1,23):
-            shell("ml plink; plink --vcf {input} --chr {chromo} --make-bed --out {prefix}/geno/{data_code}.{chromo} --extract {ld_ref}/1000G.EUR.{chromo}.bim")
+            shell("ml plink; plink --vcf {input} --chr {chromo} --make-bed --out {prefix}/geno/{data_code}.{chromo} --extract {ld_ref}/{ld_prefix}{chromo}.bim")
 
 
 # run Fahri/Gusev's bash script on each chunk
