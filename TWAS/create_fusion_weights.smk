@@ -28,25 +28,29 @@ n_sample = config["n_sample"]
 pheno_df = config["pheno_df"]
 cov_df = config["cov_df"]
 out_folder = config["out_folder"]
-chr_type = "chr1"
+genome = config["genome"]
+n_chunk = config["n_chunk"]
 
 # hardcoded inputs
 # LD reference - from FUSION
 # number of chunks - how many phenotypes to be run in a job
 # for testing 
-n_chunk = 100
 
 CHUNKS = range(1,n_chunk + 1)
 fusion_dir = "/sc/arion/projects/ad-omics/data/software/fusion_twas-master/"
 
 # hg19
-ld_ref = fusion_dir + "LDREF"
-ld_prefix = "1000G.EUR."
-
+if genome == "hg19":
+    chr_type = "1"
+    ld_ref = fusion_dir + "LDREF"
+    ld_prefix = "1000G.EUR."
+    chr_list = range(1,23)
 # hg38 - from Fahri
-ld_ref = fusion_dir + "LDREF_hg38"
-ld_prefix = "hwe1e6.1000G.EURn404.GRCh38_fk.chr"
-
+if genome == "hg38":
+    chr_type = "chr1"
+    ld_ref = fusion_dir + "LDREF_hg38"
+    ld_prefix = "hwe1e6.1000G.EURn404.GRCh38_fk."
+    chr_list = [ "chr" + str(i) for i in range(1,23) ]
 
 prefix = out_folder + data_code
 
@@ -86,11 +90,9 @@ rule split_vcf:
     input:
         vcf
     output:
-        expand( prefix + "/geno/" + data_code + ".{CHR}.bed", CHR = range(1,23) )
+        expand( prefix + "/geno/" + data_code + ".{CHR}.bed", CHR = chr_list )
     run:
-        for chromo in range(1,23):
-            if chr_type == "chr1":
-                chromo = "chr" + chromo
+        for chromo in chr_list:
             shell("ml plink; plink --vcf {input} --chr {chromo} --make-bed --out {prefix}/geno/{data_code}.{chromo} --extract {ld_ref}/{ld_prefix}{chromo}.bim")
 
 
@@ -99,7 +101,7 @@ rule compute_twas_weights:
     input:
         pheno = prefix + "/pheno/" + data_code + ".pheno.{CHUNK}.bed",
         cov = prefix + "/cov/" + data_code + ".covariates.tsv",
-        geno = expand( prefix + "/geno/" + data_code + ".{CHR}.bed", CHR = range(1,23) )
+        geno = expand( prefix + "/geno/" + data_code + ".{CHR}.bed", CHR = chr_list )
     output:
         prefix + "/logs/chunk.{CHUNK}.log"
     params:
