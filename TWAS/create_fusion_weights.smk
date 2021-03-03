@@ -89,6 +89,8 @@ rule split_vcf:
         expand( prefix + "/geno/" + data_code + ".{CHR}.bed", CHR = range(1,23) )
     run:
         for chromo in range(1,23):
+            if chr_type == "chr1":
+                chromo = "chr" + chromo
             shell("ml plink; plink --vcf {input} --chr {chromo} --make-bed --out {prefix}/geno/{data_code}.{chromo} --extract {ld_ref}/{ld_prefix}{chromo}.bim")
 
 
@@ -107,7 +109,7 @@ rule compute_twas_weights:
         out_prefix = data_code,
         n_threads = 1
     shell:
-        "sh {params.script} {input.pheno} {prefix}/geno/{data_code} {ld_ref} {input.cov} {params.n1_chunk} {params.out_prefix} {out_folder}/{data_code} {params.n_threads} {params.fusion_script} > {output}"
+        "sh {params.script} {input.pheno} {prefix}/geno/{data_code} {ld_ref} {input.cov} {params.n1_chunk} {params.out_prefix} {out_folder}/{data_code} {params.n_threads} {params.fusion_script} &> {output}"
 
 # create POS file listing the models
 rule prepare_pos_file:

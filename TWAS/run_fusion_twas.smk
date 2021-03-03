@@ -4,7 +4,7 @@ import pandas as pd
 data_code = config["data_code"]
 sumstat_file = config["sumstat_file"]
 
-fusion_dir = "/sc/arion/projects/ad-omics/data/software/fusion_twas-master"
+fusion_dir = "/sc/arion/projects/ad-omics/data/software/fusion_twas-master/"
 out_folder = "results/"
 prefix = out_folder + data_code
 sumstat_file = "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/nicolas_hg38_gwas_munged.sumstats.gz"
@@ -19,6 +19,11 @@ metadata = pd.read_csv(config["weight_files"])
 metadata_dict = metadata.set_index('dataset').T.to_dict() 
 weight_codes = metadata["dataset"]
 print(weight_codes)
+
+ld_ref = fusion_dir + "LDREF_hg38"
+ld_prefix = "hwe1e6.1000G.EURn404.GRCh38_fk.chr"
+
+
 
 rule all:
     input: 
@@ -35,7 +40,7 @@ rule fusion_assoc_test:
         --weights {pos_file}  \
         --chr {wildcards.chromo}  \
         --weights_dir {weight_dir}  \
-        --ref_ld_chr {fusion_dir}/LDREF/1000G.EUR.  \
+        --ref_ld_chr {ld_ref}/{ld_prefix}  \
         --out {output} ")
  
 rule merge_fusion_res:

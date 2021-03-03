@@ -7,3 +7,5 @@ __default__:
   output: logs/{rule}:{wildcards}.stdout
   error: logs/{rule}:{wildcards}.stderr
   himem: ""
+fusion_assoc_test:
+    cores: 8
