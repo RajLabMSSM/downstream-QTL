@@ -20,12 +20,12 @@ library(optparse)
 
 pullGWAS <- function(dataset){
     message(Sys.time()," * selected dataset: ", dataset)
-    db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+    db_path <- "/sc/arion/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
     
     message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
 
-    gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = 2))
+    gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = "GWAS"))
 
     stopifnot( dataset %in% gwas_db$dataset )
     
@@ -56,7 +56,7 @@ columnDictionary <- function(file_path){
 matchRSID <- function(data, col_snp, build = "hg19"){
     message(" * reading in dbSNP")
     if(build == "hg19"){
-        dbsnp <- data.table::fread("/sc/hydra/projects/ad-omics/data/references/hg19_reference/dbSNP/hg19_common_snps_dbSNP_153.bed.gz", nThread = 4, header = FALSE)
+        dbsnp <- data.table::fread("/sc/arion/projects/ad-omics/data/references/hg19_reference/dbSNP/hg19_common_snps_dbSNP_153.bed.gz", nThread = 4, header = FALSE)
         colnames(dbsnp) <- c("chr", "start", "end", "snp")
     }
     data$chr <- dbsnp$chr[ match(data[[col_snp]], dbsnp$snp)]
@@ -168,7 +168,7 @@ tabixGWAS <- function(gwas, outFolder = "./"){
 
 option_list <- list(
     make_option(c('-n', '--dataset' ), help='the name of the dataset. This must match the value in the database', default = "Marioni_test"),
-    make_option(c('-o', '--out_folder'), help = "the full path to where the processed GWAS should be written to", default = "/sc/hydra/projects/ad-omics/data/references/GWAS/")
+    make_option(c('-o', '--out_folder'), help = "the full path to where the processed GWAS should be written to", default = "/sc/arion/projects/ad-omics/data/references/GWAS/")
 )
 
 
