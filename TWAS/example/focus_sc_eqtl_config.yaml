@@ -1,3 +1,4 @@
-data_code: "Nicolas_ALS"
+data_code: "SC_eQTL"
+sumstat_name: "Nicolas_ALS"
 sumstat_file: "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/nicolas_hg38_gwas_munged.sumstats.gz"
-weight_files: "NYGC_weight_files.csv"
+weight_files: "NYGC_eQTL_weights.csv"

@@ -55,6 +55,6 @@ rule merge_fusion_res:
     shell:
         "ml R/3.6.0;"
         "Rscript {params.script} -i {out_folder}{wildcards.weight}/ -o {output} "
-
 # some datasets are missing pos files
 # create them if missing by using GENCODE metadata and the Ensembl IDs used by the weights
+

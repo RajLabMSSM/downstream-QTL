@@ -1,0 +1,9 @@
+data_code: "NYGC_Cervical_Spinal_Cord"
+vcf: "/sc/arion/projects/als-omics/WGS_QC/NYGC_Freeze02_European_Feb2020/WGS_QC_Pipeline/NYGC_Freeze02_European_Feb2020/output/chrAll_QCFinished_MAF0.01.anno.vcf.gz"
+mode: "eQTL"
+n_sample: 216
+pheno_df: "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/CervicalSpinalCord_expression/CervicalSpinalCord_expression.phenotype.tensorQTL.gene.bed.gz"
+out_folder: "results/"
+cov_df: "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/CervicalSpinalCord_expression/peer30/CervicalSpinalCord_expression_peer30.gene.combined_covariates.txt"
+n_chunk: 100
+genome: "hg38"

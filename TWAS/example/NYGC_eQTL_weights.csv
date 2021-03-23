@@ -1,0 +1,4 @@
+dataset,weight_dir,pos_file
+NYGC_Cervical_Spinal_Cord,/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/TWAS,/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/TWAS/results/NYGC_Cervical_Spinal_Cord/WEIGHTS/NYGC_Cervical_Spinal_Cord.pos
+NYGC_Thoracic_Spinal_Cord,/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/TWAS,/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/TWAS/results/NYGC_Thoracic_Spinal_Cord/WEIGHTS/NYGC_Thoracic_Spinal_Cord.pos
+NYGC_Lumbar_Spinal_Cord,/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/TWAS,/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/TWAS/results/NYGC_Lumbar_Spinal_Cord/WEIGHTS/NYGC_Lumbar_Spinal_Cord.pos

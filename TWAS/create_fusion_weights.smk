@@ -128,6 +128,6 @@ rule prepare_pos_file:
         "ml R/3.6.0;"
         "printf '%s\\n' {prefix}/WEIGHTS/*RDat > {output.wgt_list}; "
         "Rscript {params.profile_script} {output.wgt_list} > {output.wgt_profile}; "
-        "Rscript {params.prep_script} --n_sample {n_sample} --weight_folder {prefix}/WEIGHTS --panel {data_code}"
+        "Rscript {params.prep_script} --n_sample {n_sample} --weight_folder {prefix}/WEIGHTS --panel {data_code} --chr_type {chr_type} --mode {mode}"
 
 
