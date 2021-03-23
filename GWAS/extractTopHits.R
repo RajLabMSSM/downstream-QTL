@@ -133,9 +133,9 @@ top_hits <- map_df( 1:22, ~{
 
 
 hits_df <- top_hits %>%
-    dplyr::mutate(start = pos, end = pos + 1 ) %>%
+    dplyr::mutate(start = pos -1, end = pos ) %>%
     dplyr::mutate(locus = paste0("locus_", chr, "_", snp) ) %>%
-    dplyr::select(locus, chr, start, end, snp, A1, A2, effect, se, p )
+    dplyr::select(locus, chr, start, end, snp, A1, A2, effect, se, p, pos )
 
 # to do: match nearest gene from, errr, GENCODE?
 
