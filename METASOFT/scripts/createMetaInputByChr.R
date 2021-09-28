@@ -78,6 +78,11 @@ extractTargetQTL <- function(qtl, chr ){
     cmd <- paste( "zless ", qtl$full_path, " | head -1 " )
     columns <- colnames(data.table::fread( cmd = cmd, header= TRUE))
     col_dict <- setNames(1:length(columns), columns)
+    
+    if( ! all( c(phenoCol, pvalCol, snpCol, betaCol, seCol) %in% names(col_dict) ) ){
+        print(col_dict)
+        stop(" check header of nominal sumstats file" )
+    }
     #stopifnot( ncol(result) == length(col_dict) )
     names(result)[names(col_dict) == phenoCol] <- "pheno"
     names(result)[names(col_dict) == pvalCol]  <- "pvalue"
@@ -87,7 +92,8 @@ extractTargetQTL <- function(qtl, chr ){
     # NaN values in SE sometimes? Infinite values?
     result$se[ is.nan(result$se) | result$se == 0 | is.infinite(result$se) ] <- NA
     result$beta[ is.nan(result$beta) | result$beta == 0 | is.infinite(result$beta) ] <- NA
-
+    
+    print(head(result) )
     # RE2C fails when NAs are present so remove any rows (associations) with missing data.
     result <- result[, c("snp", "pheno", "beta", "se", "pvalue") ]
     result <- result[ complete.cases(result),]

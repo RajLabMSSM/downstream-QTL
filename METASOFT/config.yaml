@@ -1,11 +1,14 @@
 datasets:
-    - Frontal_Cortex_NYGC
-    - Cerebellum_NYGC
-    - Cervical_Spinal_Cord_NYGC
-    - Lumbar_Spinal_Cord_NYGC
-    - Lateral_Motor_Cortex_NYGC
-    - Medial_Motor_Cortex_NYGC
-    - Temporal_Cortex_NYGC
-outFolder: "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/METASOFT/"
-dataCode: "all_nygc_eqtl"
-vcf: "test.vcf"
+ - MiGASti_GFM_Unstim
+ - MiGASti_GFM_IFNy
+ - MiGASti_GFM_LPS
+ - MiGASti_SVZ_Unstim
+ - MiGASti_SVZ_IFNy
+ - MiGASti_SVZ_LPS
+ - Microglia_THA
+ - Microglia_SVZ
+ - Microglia_MFG
+ - Microglia_STG
+outFolder: "results/all"
+dataCode: "MiGA_MiGASti"
+vcf: "/sc/arion/projects/als-omics/microglia_stimulated/Genotype_QC_Pipeline_2.0/output/clean_data/microglia_stimulated_anno.MAF.vcf.gz"

@@ -7,14 +7,15 @@
 # - dataset2
 # outFolder: "."
 # dataCode: "test"
-
+import os
 datasets = config["datasets"]
 
 prefix = "-".join(datasets)
 
 outFolder = config["outFolder"]
 
-dataset_string = outFolder + prefix
+dataset_string = os.path.join(outFolder, prefix)
+print(dataset_string)
 
 chromosomes = list(range(1,23))
 vcf = config["vcf"]
