@@ -87,7 +87,10 @@ all_res <- select(all_res, GWAS, disease, QTL, -file, everything() )
 # deal with gene
 # sQTLs include junction too
 all_res$geneid <- map_chr(str_split(all_res$gene, ":"), ~{ .x[ length(.x) ] })
-all_res$geneid <- str_split_fixed(all_res$geneid, "\\.", 2)[,1]
+
+
+# TODO: if fusion or antisense gene then don't trim off tag
+#all_res$geneid <- ifelse( grepl("_|AS", all_res$geneid), all_res$geneid,  str_split_fixed(all_res$geneid, "\\.", 2)[,1] )
 
 # have separate junction column
 all_res$QTL_junction <- map_chr(str_split(all_res$gene, ":"), ~{ paste0(.x[1], ":", .x[2], "-", .x[3])  })
@@ -98,7 +101,7 @@ gene_meta <- read_tsv("/sc/arion/projects/ad-omics/data/references/hg38_referenc
     select(genename, geneid) %>% distinct()
 
 # remove tags
-gene_meta$geneid <- str_split_fixed(gene_meta$geneid, "\\.", 2)[,1]
+#gene_meta$geneid <- str_split_fixed(gene_meta$geneid, "\\.", 2)[,1]
 
 # match on gene symbols
 all_res$genename <- gene_meta$genename[ match(all_res$geneid, gene_meta$geneid) ]

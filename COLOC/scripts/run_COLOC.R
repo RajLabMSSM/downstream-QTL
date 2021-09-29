@@ -407,6 +407,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     }else{
         message("       * using supplied MAF")
         names(result)[names(col_dict) == mafCol] <- "MAF"
+        print(col_dict)
+        print(head(result) )
     }
 
     # deal with edge cases - 1 gene and the gene id is NA
