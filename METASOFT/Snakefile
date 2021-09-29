@@ -7,21 +7,22 @@
 # - dataset2
 # outFolder: "."
 # dataCode: "test"
-
+import os
 datasets = config["datasets"]
 
 prefix = "-".join(datasets)
 
 outFolder = config["outFolder"]
 
-dataset_string = outFolder + prefix
+dataset_string = os.path.join(outFolder, prefix)
+print(dataset_string)
 
 chromosomes = list(range(1,23))
 vcf = config["vcf"]
 
 rule all:
     input:
-        expand(dataset_string + ".{tool}.tabixed.tsv.gz.tbi", tool = ["metasoft", "re2c"])
+        expand(dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz.tbi", tool = ["metasoft", "re2c"], filetype = ["full_assoc", "top_assoc"])
 
 rule createInputFiles:
     output:
@@ -29,7 +30,7 @@ rule createInputFiles:
     params:
         dataset_args = " ".join(datasets)
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.0.3;"
         "Rscript scripts/createMetaInputByChr.R -c {wildcards.chr} -o {outFolder} {params.dataset_args} "
 
 
@@ -49,7 +50,7 @@ rule runRE2C:
     params:
         re2c = "/sc/arion/projects/ad-omics/data/software/RE2Cv1_04/RE2C.sh"
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.0.3;"
         "sh {params.re2c} --input {input} --output {output}; "
         "mv {output}.txt {output}" # RE2C appends .txt to end of output - remove it
 
@@ -60,7 +61,7 @@ rule runRECOV:
         RECOV = "/sc/arion/projects/ad-omics/data/software/RECOV/fitLlh1Gene4github.R",
         logfile = dataset_string + ".{chr}.recov.log.txt"
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.0.3;"
         #"Rscript {params.RECOV} {input} {output}" 
         "R CMD BATCH --no-save --no-restore \"--args {input} {output} 10 \" {params.RECOV} {params.logfile}"
 
@@ -75,17 +76,20 @@ rule formatResults:
     input: 
         res = dataset_string + ".{chr}.{tool}.res.tsv",
         vcf_df = outFolder + "vcf.processed.txt"
-    output:  dataset_string + ".{chr}.{tool}.formatted.tsv",
+    output:  
+        full = dataset_string + ".{chr}.{tool}.full_assoc.tsv",
+        top = dataset_string + ".{chr}.{tool}.top_assoc.tsv"
     shell:
-        "ml R/3.6.0;"
-        "Rscript scripts/formatMETASOFT.R -c {wildcards.chr} -i {input.res} -o {output} -v {input.vcf_df} "
+        "ml R/4.0.3;"
+        "Rscript scripts/formatMETASOFT.R -c {wildcards.chr} -i {input.res} -o {dataset_string}.{wildcards.chr}.{wildcards.tool} -v {input.vcf_df} "
 
 # merge together and tabix
 rule mergeResults:
-    input: expand( dataset_string + ".{chr}.{tool}.formatted.tsv", chr = chromosomes,allow_missing=True )
+    input: 
+        expand( dataset_string + ".{chr}.{tool}.{filetype}.tsv", chr = chromosomes, allow_missing=True ),
     output: 
-        gzip = dataset_string + ".{tool}.tabixed.tsv.gz",
-        tbi = dataset_string + ".{tool}.tabixed.tsv.gz.tbi"
+        gzip = dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz",
+        tbi = dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz.tbi"
     shell:
         "ml bcftools/1.9;"
         "cat {input} | bgzip > {output.gzip};"
