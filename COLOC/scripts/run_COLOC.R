@@ -235,7 +235,7 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/da
     # se is standard error - not standard deviation!
     result$varbeta <- result$varbeta^2
     print(head(result))
-    save.image("debug.RData") 
+    #save.image("debug.RData") 
     result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos, A1, A2)
     
     result <- as.list(result)
