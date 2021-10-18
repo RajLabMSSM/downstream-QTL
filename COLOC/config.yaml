@@ -3,19 +3,16 @@ gwas:
     - Jansen_2018
     - Kunkle_2019
     - Bellenguez_2021
+    - Nalls23andMe_2019
+    - NicolasSuggestive_2018
+    - VanRheenenEUR_2021
 qtl:
-  - gaffney_microglia_isoseq_eQTL
-  - gaffney_microglia_gencode_eQTL
-  - roussos_microglia_isoseq_eQTL
-  - roussos_microglia_gencode_eQTL
-  - raj_microglia_MFG_gencode_eQTL
-  - raj_microglia_MFG_isoseq_eQTL
-  - raj_microglia_STG_gencode_eQTL
-  - raj_microglia_STG_isoseq_eQTL
-  - raj_microglia_SVZ_gencode_eQTL
-  - raj_microglia_SVZ_isoseq_eQTL
-  - raj_microglia_THA_gencode_eQTL
-  - raj_microglia_THA_isoseq_eQTL
+  - Bryois_Microglia
+  - Microglia_mmQTL_isoseq
+  - Microglia_mmQTL_GENCODE
+  - Microglia_tensorQTL_GENCODE
+  - mmQTL_isoseq_transcripts
+  - mmQTL_GENCODE_transcripts
 
 outFolder: "results/"
 

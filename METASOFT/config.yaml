@@ -1,5 +1,4 @@
 datasets:
-<<<<<<< HEAD
  - Gaffney_EUR_GENCODE
  - Raj-MFG_EUR_GENCODE
  - Raj-STG_EUR_GENCODE
@@ -9,4 +8,3 @@ datasets:
 outFolder: "results/"
 dataCode: "Microglia_EUR_GENCODE"
 vcf: "/sc/arion/projects/als-omics/microglia_isoseq/Genotype_QC_Pipeline_2.0/output/gaffney/clean_data/gaffney_microglia_anno.noMAF.vcf.gz"
-
