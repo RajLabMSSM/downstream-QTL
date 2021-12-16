@@ -4,14 +4,15 @@ library(tidyverse)
 library(LDlinkR)
 library(optparse)
 option_list <- list(
-    make_option(c('-i', '--inFolder' ), help='The full path to the folder that contains the COLOC results', default = "")
+    make_option(c('-i', '--inFolder' ), help='The full path to the folder that contains the COLOC results', default = ""),
+    make_option(c('-g', '--geneMeta'), help = "Path to gene metadata, matching Ensembl IDs to gene names", default = "/sc/hydra/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv")
 )
 
 option.parser <- OptionParser(option_list=option_list)
 opt <- parse_args(option.parser)
 
 inFolder <- opt$inFolder
-
+geneMeta <- opt$geneMeta
 outFile <- paste0(inFolder, "all_COLOC_summary_results.tsv.gz")
 message(" * writing to ", outFile)
 
@@ -51,7 +52,9 @@ all_res <- select(all_res, GWAS, disease, QTL,  everything() )
 #all_res$geneid <- map_chr(str_split(all_res$geneid, ":"), ~{ .x[ length(.x) ] })
 all_res$geneid <- str_split_fixed(all_res$geneid, "\\.", 2)[,1]
 
-gene_meta <- read_tsv("/sc/hydra/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>% 
+# expects columns genename and geneid
+#gene_meta <- read_tsv("/sc/hydra/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>% 
+gene_meta <- read_tsv(geneMeta) %>%
     janitor::clean_names() %>%
     select(genename, geneid) %>% distinct()
 

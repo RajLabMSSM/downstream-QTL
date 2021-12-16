@@ -6,6 +6,7 @@ library(optparse)
 option_list <- list(
     make_option(c('--inFolder' ), help='The full path to the folder that contains the COLOC results', default = ""),
     make_option(c('--threshold'), help = "minimum PP.H4.abf value", default = 0),
+    make_option(c('-g', '--geneMeta'), help = "Path to gene metadata, matching Ensembl IDs to gene names", default = "/sc/hydra/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv"),
     make_option(c('--ld'), help = "whether to match LD or not", action="store_true", default=FALSE)
 )
 
@@ -15,6 +16,7 @@ opt <- parse_args(option.parser)
 calculate_LD <- opt$ld
 inFolder <- opt$inFolder
 H4_threshold <- opt$threshold
+geneMeta <- opt$geneMeta
 
 if( calculate_LD == TRUE){
     LD_string <- "_with_LD"
@@ -66,7 +68,8 @@ all_res$GWAS <- map_chr(str_split(all_res$file, "_"), ~{ n = length(.x); paste0(
 gwas_key <- 
 tribble(
   ~GWAS, ~disease,
-    "Ripke_2014", "SCZ",
+    "Bellenguez_2021", "AD", 
+   "Ripke_2014", "SCZ",
     "Wray_2018", "MDD",
     "IMSGC_2019", "MS",  
     "Stahl_2019", "BPD",
@@ -86,6 +89,8 @@ all_res <- select(all_res, GWAS, disease, QTL, -file, everything() )
 
 # deal with gene
 # sQTLs include junction too
+all_res$feature <- all_res$gene
+
 all_res$geneid <- map_chr(str_split(all_res$gene, ":"), ~{ .x[ length(.x) ] })
 
 
@@ -96,7 +101,9 @@ all_res$geneid <- map_chr(str_split(all_res$gene, ":"), ~{ .x[ length(.x) ] })
 all_res$QTL_junction <- map_chr(str_split(all_res$gene, ":"), ~{ paste0(.x[1], ":", .x[2], "-", .x[3])  })
 
 
-gene_meta <- read_tsv("/sc/arion/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>% 
+gene_meta <- 
+    read_tsv(geneMeta) %>%
+#read_tsv("/sc/arion/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.tx2gene.tsv") %>% 
     janitor::clean_names() %>%
     select(genename, geneid) %>% distinct()
 
@@ -112,12 +119,12 @@ all_res$QTL_Gene <- coalesce(all_res$genename, all_res$geneid)
 # add geneid back to make sure
 all_res$QTL_Ensembl <- gene_meta$geneid[match(all_res$QTL_Gene, gene_meta$genename)] 
 
-all_res$type <- ifelse( grepl("sQTL", all_res$QTL), "sQTL", "eQTL" )
+#all_res$type <- ifelse( grepl("sQTL", all_res$QTL), "sQTL", "eQTL" )
 
 # make junction NA if eQTL
-all_res$QTL_junction <- ifelse(all_res$type == "sQTL", all_res$QTL_junction, ".")
+#all_res$QTL_junction <- ifelse(all_res$type == "sQTL", all_res$QTL_junction, ".")
 
-all_res <- select(all_res, disease, GWAS, locus, starts_with("GWAS"), QTL, type, starts_with("QTL"), nsnps, starts_with("PP") )
+all_res <- select(all_res, disease, GWAS, locus, starts_with("GWAS"), QTL, feature, starts_with("QTL"), nsnps, starts_with("PP") )
 
 # add pairwise LD using LDlink
 # split into chunks by GWAS SNP
