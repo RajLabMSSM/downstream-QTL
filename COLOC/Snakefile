@@ -20,7 +20,7 @@ rule run_COLOC:
         script = "scripts/run_COLOC.R"
     shell:
         "mkdir -p {outFolder}{wildcards.GWAS};"
-        "ml R/3.6.0; ml arrow;"
+        "ml R/4.0.3;" #ml arrow;"
         "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -o {outFolder}{wildcards.GWAS}/ "
 
 rule extract_COLOC_summary:
@@ -31,7 +31,7 @@ rule extract_COLOC_summary:
     params:
         script = "scripts/extract_COLOC_summary.R"
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.0.3;"
         "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -i {input} -o {output} "
     
 rule merge_COLOC_snp_level:
@@ -43,7 +43,7 @@ rule merge_COLOC_snp_level:
     params:
         script = "scripts/merge_COLOC_results.R"
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.0.3;"
         "Rscript {params.script} --threshold 0 --inFolder {outFolder};" 
         "Rscript {params.script} --threshold 0.5 --ld --inFolder {outFolder} "
 
@@ -55,7 +55,7 @@ rule merge_COLOC_summary_level:
     params:
         script = "scripts/merge_COLOC_summary.R"
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.0.3;"
         "Rscript {params.script} --inFolder {outFolder}"
 
 rule create_LD_tables:

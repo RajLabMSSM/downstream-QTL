@@ -46,7 +46,10 @@ extractTopQTL <- function(qtl, qvalue_threshold){
     loci_df$snp <- loci_df[[qtl$top_snp]]
     loci_df$pval <- loci_df[[qtl$top_p_perm]]
     loci_df$pheno <- loci_df[[qtl$top_pheno]]
-    
+    loci_df$source_beta <- loci_df[[qtl$top_effect]]
+    loci_df$source_se <- loci_df[[qtl$top_se]]
+
+  
     # adjust EnsemblID - remove tag number
     loci_df$pheno <- stringr::str_split_fixed(loci_df$pheno, "\\.", 2)[,1]
     
@@ -64,7 +67,7 @@ extractTopQTL <- function(qtl, qvalue_threshold){
     if(qtl$phenotype == "sQTL"){
         loci_df$pheno <- gsub("clu_[0-9]+_", "", loci_df$pheno )
     } 
-    loci_clean <- dplyr::select(loci_df, snp, pheno, pval, qval)
+    loci_clean <- dplyr::select(loci_df, snp, pheno, source_pvalue = pval, source_qvalue = qval, source_beta, source_se)
     # same for beta and MAF?
     return(loci_clean)
 }
@@ -83,7 +86,7 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
     }
 
     # rename columns 
-    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$full_maf, qtl$N, qtl$build) ) ))
+    stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
     betaCol <- qtl$full_effect
     phenoCol <- qtl$full_pheno
@@ -97,8 +100,10 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
     col_dict <- setNames(1:length(columns), columns)
     #stopifnot( ncol(result) == length(col_dict) )
     names(result)[names(col_dict) == phenoCol] <- "pheno"
-    names(result)[names(col_dict) == pvalCol]  <- "pvalue"
+    names(result)[names(col_dict) == pvalCol]  <- "target_pvalue"
     names(result)[names(col_dict) == snpCol]   <- "snp"
+    names(result)[names(col_dict) == betaCol]   <- "target_beta"
+    names(result)[names(col_dict) == seCol]   <- "target_se"
     
     # weird exception - Young Microglia stores p-values as log10 - convert
     if( qtl$full_p == "log10_p"){
@@ -115,7 +120,7 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
 
     # subset out just SNP-Gene pairs in source_qtls
     res_subset <- dplyr::filter(result, pheno %in% source_qtls$pheno & snp %in% source_qtls$snp ) %>%
-        select( pheno, snp, pvalue_target = pvalue)
+        select( pheno, snp, target_beta, target_se, target_pvalue)
     
     return(res_subset)
 }
@@ -125,7 +130,7 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
 run_qvalue <- function(x){
     tryCatch(
         expr = {
-            return(qvalue::qvalue_truncp(x) )
+            return(qvalue::qvalue(x) ) # qvalue_truncp missing right now
             message("Successfully executed the log(x) call.")
         },
         error = function(e){
@@ -145,7 +150,7 @@ run_qvalue <- function(x){
 # calculate pi1 and return table
 get_pi_1 <- function(df, sourceName, targetName){
     
-    res <- run_qvalue(df$pvalue_target)
+    res <- run_qvalue(df$target_pvalue)
 
     # if P-values are all highly significant then qvalue will throw an error
     if("error" %in% class(res)){
@@ -209,7 +214,7 @@ target_res <- purrr::map_df( chroms, ~{extractTargetQTL(qtl_target, .x, source_t
 qvalue_res <- left_join(source_top_res, target_res, by = c("pheno", "snp") )
 
 # remove missing values
-qvalue_res <- qvalue_res[ !is.na(qvalue_res$pvalue_target), ]
+qvalue_res <- qvalue_res[ !is.na(qvalue_res$target_pvalue), ]
 
 # write data
 save(qvalue_res, source_top_res, target_res,  file = gsub("tsv", "RData", outFile) )

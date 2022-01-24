@@ -234,7 +234,8 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/da
     # convert standard error to the variance
     # se is standard error - not standard deviation!
     result$varbeta <- result$varbeta^2
-    
+    print(head(result))
+    save.image("debug.RData") 
     result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos, A1, A2)
     
     result <- as.list(result)
@@ -376,6 +377,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     cmd <- paste( "zless ", qtl$full_path, " | head -1 " )
     columns <- colnames(data.table::fread( cmd = cmd ))
     col_dict <- setNames(1:length(columns), columns)
+    
+    print(col_dict)
     stopifnot( ncol(result) == length(col_dict) )
     names(result)[names(col_dict) == phenoCol] <- "gene"
     names(result)[names(col_dict) == mafCol]   <- "MAF"
@@ -404,11 +407,13 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
         #stopifnot( "chr" %in% names(col_dict) )
         names(result)[names(col_dict) == "chr"] <- "chr"
         result <- matchMAF(result, maf = maf_1000g)
+        print(head(result) )
     }else{
         message("       * using supplied MAF")
         names(result)[names(col_dict) == mafCol] <- "MAF"
+        print(col_dict)
+        print(head(result) )
     }
-
     # deal with edge cases - 1 gene and the gene id is NA
     if( all( is.na(result$gene) ) ){
         message(" * no genes in QTL result")
@@ -417,10 +422,12 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
         result <- dplyr::filter(result, !is.na(gene) )
     }
     # if MAF needs matching then chrCol will be "chr" - change it back to "QTL_chr"
-    names(result)[names(col_dict) == chrCol]   <- "QTL_chr"
-    names(result)[names(col_dict) == posCol]   <- "QTL_pos"
+    print( names(col_dict) )
+    print( names(col_dict) == chrCol )
+    names(result)[which(names(col_dict) == chrCol) ]   <- "QTL_chr"
+    names(result)[which(names(col_dict) == posCol) ]   <- "QTL_pos"
 
-    #print(head(result) ) 
+    print(head(result) ) 
     
     # retain only associations within locus coords
     if( !is.na(betaCol) & !is.na(seCol) ){
@@ -428,6 +435,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     }else{
         res_subset <- dplyr::select(result, gene, snp, pvalues, MAF, QTL_chr, QTL_pos)
     }
+
+    print("passed this point")
     #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
        
     # split by gene, convert to list object

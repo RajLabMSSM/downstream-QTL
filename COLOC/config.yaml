@@ -1,32 +1,18 @@
 gwas:
-    - Ripke_2014
-    - Wray_2018
-    - IMSGC_2019
-    - Stahl_2019
-    - Daner_2020
-    - Nalls23andMe_2019
-    - Lambert_2013
     - Marioni_2018
     - Jansen_2018
     - Kunkle_2019
-    - Nicolas_2018_hg38
-
+    - Bellenguez_2021
+    - Nalls23andMe_2019
+    - NicolasSuggestive_2018
+    - VanRheenenEUR_2021
 qtl:
-    - Microglia_THA
-    - Microglia_SVZ
-    - Microglia_MFG
-    - Microglia_STG
-    - Microglia_sQTL_THA
-    - Microglia_sQTL_SVZ
-    - Microglia_sQTL_MFG
-    - Microglia_sQTL_STG
-    - Microglia_all_regions
-    - Microglia_all_regions_Young
-    - Monocytes_Fairfax
-    - Monocytes_MyND
-    - Monocytes_sQTL_MyND
-    - DLPFC_ROSMAP
-    - Microglia_Young
-    - Microglia_all_regions_sQTL
-outFolder: "/sc/hydra/projects/ad-omics/microglia_omics/COLOC/"
+  - Bryois_Microglia
+  - Microglia_mmQTL_isoseq
+  - Microglia_mmQTL_GENCODE
+  - Microglia_tensorQTL_GENCODE
+  - mmQTL_isoseq_transcripts
+  - mmQTL_GENCODE_transcripts
+
+outFolder: "results/"
 
