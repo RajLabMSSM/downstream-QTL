@@ -22,7 +22,8 @@ vcf = config["vcf"]
 
 rule all:
     input:
-        expand(dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz.tbi", tool = ["metasoft", "re2c"], filetype = ["full_assoc", "top_assoc"])
+        expand(dataset_string + ".{tool}.{filetype}.qval.tsv.gz",  tool = ["metasoft", "re2c"], filetype = ["top_assoc"] ),
+        expand(dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz.tbi", tool = ["metasoft", "re2c"], filetype = "full_assoc" )
 
 rule createInputFiles:
     output:
@@ -84,15 +85,28 @@ rule formatResults:
         "Rscript scripts/formatMETASOFT.R -c {wildcards.chr} -i {input.res} -o {dataset_string}.{wildcards.chr}.{wildcards.tool} -v {input.vcf_df} "
 
 # merge together and tabix
-rule mergeResults:
+rule mergeFullResults:
     input: 
-        expand( dataset_string + ".{chr}.{tool}.{filetype}.tsv", chr = chromosomes, allow_missing=True ),
+        expand( dataset_string + ".{chr}.{tool}.{filetype}.tsv", chr = chromosomes, filetype = "full_assoc", allow_missing=True ),
     output: 
         gzip = dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz",
         tbi = dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz.tbi"
     shell:
         "ml bcftools/1.9;"
         "cat {input} | bgzip > {output.gzip};"
-        "tabix -s 2 -b 3 -e 3 -S 1 {output.gzip}"     
+        "tabix -s 3 -b 4 -e 4 -S 1 {output.gzip}"     
 
-
+## bring together top association per feature
+## run qvalue to correct for number of features tested
+## no tabix because files are sorted by 
+rule mergeTopResults:
+    input:
+        expand( dataset_string + ".{chr}.{tool}.{filetype}.tsv", chr = chromosomes, filetype = "top_assoc", allow_missing=True ) 
+    output:
+        gzip = dataset_string + ".{tool}.top_assoc.qval.tsv.gz"
+    params:
+        tmp = dataset_string + ".{tool}.top_assoc.tmp.tsv.gz"
+    shell:
+        "ml R/4.0.3; ml bcftools/1.9;"
+        "cat {input} | gzip > {params.tmp};"
+        "Rscript scripts/qvalueMETASOFT.R -i {params.tmp} -o {output}"
