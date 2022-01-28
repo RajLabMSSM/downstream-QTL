@@ -18,58 +18,10 @@ tabix (ml bcftools/1.9)
 
 ### R packages
 
-* arrow 
-
-```
-git clone https://github.com/apache/arrow
-cd arrow/r
-R CMD INSTALL 
-```
 
 * COLOC
 
 ### Functions:
-
-**processGWAS.R** - take a GWAS summary stat file and split by chromosome, sort by position and tabix index
-
-    input: GWAS file
-
-    output: tabix indexed GWAS files
-
-    parameters: which columns to use - use EBI GWAS catalogue as default
-
-```
-Options:
-    -i INFILE, --inFile=INFILE
-        the full GWAS summary stats
-
-    -o OUTFILE, --outFile=OUTFILE
-        the path to the output file - without file type suffix
-
-    --chrCol=CHRCOL
-        the column number that stores the chromosome of the variant
-
-    --posCol=POSCOL
-        the column number that stores the genomic position of the variant
-
-    --noChrPrefix
-        don't prepend chr to the chromosome column values
-
-    -h, --help
-        Show this help message and exit
-```
-
-This will create a set of individual tabixed chromosome files.
-
-**extractTopHits.R** - from a summary stat file, get out the top hit variants at a given significance threshold (default 1e-8)
-
-    input: tabix indeed GWAS file
-
-    output: table with coordinates, betas and P-values of top hits
-
-    parameters: given significance threshold
-
-
 
 
 **runCOLOC.R** - run COLOC on with the two P-value distributions
@@ -102,10 +54,18 @@ Options:
 
 1. Extract top hits from GWAS
 
+These are now taken care of in the GWAS scripts
+
 2. For a given GWAS and a top hit variant:
     - extract all nominal QTL associations within 1MB from the hit variant (ExtractNominalQTLs)
     - extract all GWAS stats within the same region
     for each gene:
         run COLOC to test for colocalisation with each gene's QTL P-value distribution and the GWAS distribution
 
+
+## LDlinkR
+
+to calculate LD between the lead GWAS and lead QTL SNPs, we use the LDLinkR R package. You need to generate an API access token and add it to your ~/.Renviron
+`LDLINK_TOKEN=" "`
+[see here](https://cran.r-project.org/web/packages/LDlinkR/vignettes/LDlinkR.html)
 
