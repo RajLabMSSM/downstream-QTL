@@ -1,18 +1,15 @@
 gwas:
-    - Marioni_2018
-    - Jansen_2018
-    - Kunkle_2019
     - Bellenguez_2021
     - Nalls23andMe_2019
-    - NicolasSuggestive_2018
-    - VanRheenenEUR_2021
 qtl:
-  - Bryois_Microglia
-  - Microglia_mmQTL_isoseq
-  - Microglia_mmQTL_GENCODE
-  - Microglia_tensorQTL_GENCODE
-  - mmQTL_isoseq_transcripts
-  - mmQTL_GENCODE_transcripts
+ - Bryois_Astrocyte
+ - Bryois_Endothelial
+ - Bryois_ExcitatoryNeuron
+ - Bryois_InhibitoryNeuron
+ - Bryois_Microglia
+ - Bryois_Oligodendrocyte
+ - Bryois_OPC
+ - Bryois_Pericyte 
 
-outFolder: "results/"
+outFolder: "/sc/arion/projects/ad-omics/data/references//QTL/Bryois_brain_cell_eQTls/COLOC/"
 

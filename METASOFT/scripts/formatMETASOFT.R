@@ -43,10 +43,10 @@ df[, c("variant_id", "phenotype_id") := tstrsplit(RSID, "-", fixed=TRUE)]
 # For METASOFT, correct fixed and random effect Ps per gene by BH
 # for each phenotype calculate and add adjusted P values
 if( "PVALUE_RE2" %in% names(df) ){
-    df[, c("PADJ_RE2", "PADJ_FE") := .(p.adjust(.SD$PVALUE_RE2, method = "bonferroni"), p.adjust(.SD$PVALUE_FE, method = 'bonferroni') ), by = phenotype_id]
+    df[, c("PADJ_RE2", "PADJ_FE") := .(p.adjust(.SD$PVALUE_RE2, method = "FDR"), p.adjust(.SD$PVALUE_FE, method = 'FDR') ), by = phenotype_id]
 }
 if( "RE2Cp" %in% names(df) ){
-    df[, "PADJ_RE2C" := p.adjust(.SD$RE2Cp, method = "bonferroni") , by = phenotype_id]
+    df[, "PADJ_RE2C" := p.adjust(.SD$RE2Cp, method = "FDR") , by = phenotype_id]
 
 }
 # output top association per gene
@@ -95,6 +95,10 @@ if( "PADJ_RE2" %in% names(all_df) ){
 if( "RE2Cp" %in% names(all_df) ){
      top <- all_df[order(PADJ_RE2C), head(.SD,1), by = phenotype_id]
 }
+
+# order by position to allow tabixing - TODO
+#top <- top[ order(top$pos) ,]
+
 #save.image("debug.RData")
 # write out using data.table fwrite
 fwrite( top, file = output_top, sep = "\t", na = NA, quote = FALSE, col.names = write_cols, nThread = 1)
