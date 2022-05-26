@@ -43,11 +43,12 @@ df[, c("variant_id", "phenotype_id") := tstrsplit(RSID, "-", fixed=TRUE)]
 # For METASOFT, correct fixed and random effect Ps per gene by BH
 # for each phenotype calculate and add adjusted P values
 if( "PVALUE_RE2" %in% names(df) ){
-    df[, c("PADJ_RE2", "PADJ_FE") := .(p.adjust(.SD$PVALUE_RE2, method = "FDR"), p.adjust(.SD$PVALUE_FE, method = 'FDR') ), by = phenotype_id]
+   # df[, c("PADJ_RE2", "PADJ_FE") := .(p.adjust(.SD$PVALUE_RE2, method = "FDR"), p.adjust(.SD$PVALUE_FE, method = 'FDR') ), by = phenotype_id]
+    df[, c("PADJ_RE2", "PADJ_FE") := .(p.adjust(.SD$PVALUE_RE2, method = "fdr"), p.adjust(.SD$PVALUE_FE, method = 'fdr') ), by = phenotype_id]
 }
 if( "RE2Cp" %in% names(df) ){
-    df[, "PADJ_RE2C" := p.adjust(.SD$RE2Cp, method = "FDR") , by = phenotype_id]
-
+   # df[, "PADJ_RE2C" := p.adjust(.SD$RE2Cp, method = "FDR") , by = phenotype_id]
+    df[, "PADJ_RE2C" := p.adjust(.SD$RE2Cp, method = "fdr") , by = phenotype_id]
 }
 # output top association per gene
 

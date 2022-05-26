@@ -152,7 +152,8 @@ library(tidyverse)
 
 qtl_list <- purrr::map(data_list, pullData, type = "QTL" )
 
-prefix <- paste( data_list, collapse = "-" )
+#prefix <- paste( data_list, collapse = "-" )
+prefix <- "merged_cohorts"
 
 outFile_final <- file.path(outFolder, paste0( prefix, ".input.tsv" ) )
 # if chromosome is specified then just read in from that chromosome
@@ -172,8 +173,9 @@ for( chr in chrs){
     outFile <- file.path( outFolder, paste0(prefix, ".", chr, ".input.tsv" ) )
     res <- purrr::map( qtl_list, ~{
         extractTargetQTL(.x, chr = chr)
-    })  %>% 
-    reduce( inner_join, by = "snp_gene"  ) 
+    })  %>%
+    reduce( full_join, by = "snp_gene"  ) 
+    #reduce( inner_join, by = "snp_gene"  ) 
     
     stopifnot( nrow(res) > 0 )
     print(head(res) )
