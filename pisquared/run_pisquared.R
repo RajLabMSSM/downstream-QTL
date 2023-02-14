@@ -44,6 +44,37 @@ all_comp$pi2_jaccard  <- purrr::map_dbl(1:nrow(all_comp), ~{
     return(pi2_res$jaccard)
 })
 
+all_comp$both_null  <- purrr::map_dbl(1:nrow(all_comp), ~{
+    print(all_comp[.x,])
+    p1 <- all_comp[.x, 1]
+    p2 <- all_comp[.x, 2]
+    pi2_res <- pi2_estimator(df[[p1]], df[[p2]], verbose = TRUE)
+    return(pi2_res$pi[1,1])
+})
+
+all_comp$null1_alternate2  <- purrr::map_dbl(1:nrow(all_comp), ~{
+    print(all_comp[.x,])
+    p1 <- all_comp[.x, 1]
+    p2 <- all_comp[.x, 2]
+    pi2_res <- pi2_estimator(df[[p1]], df[[p2]], verbose = TRUE)
+    return(pi2_res$pi[1,2])
+})
+
+all_comp$alternate1_null2  <- purrr::map_dbl(1:nrow(all_comp), ~{
+    print(all_comp[.x,])
+    p1 <- all_comp[.x, 1]
+    p2 <- all_comp[.x, 2]
+    pi2_res <- pi2_estimator(df[[p1]], df[[p2]], verbose = TRUE)
+    return(pi2_res$pi[2,1])
+})
+
+all_comp$both_alternate  <- purrr::map_dbl(1:nrow(all_comp), ~{
+    print(all_comp[.x,])
+    p1 <- all_comp[.x, 1]
+    p2 <- all_comp[.x, 2]
+    pi2_res <- pi2_estimator(df[[p1]], df[[p2]], verbose = TRUE)
+    return(pi2_res$pi[2,2])
+})
 outFile <- paste0(outFolder, "/pisquared_results.tsv")
 
 readr::write_tsv(all_comp, path = outFile) 

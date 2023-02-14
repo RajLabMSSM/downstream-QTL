@@ -1,3 +1,4 @@
+
 datasets = config["datasets"]
 outFolder = config["outFolder"]
 
@@ -37,7 +38,7 @@ rule runPiSquared:
     input: dataset_string + ".pisquared.full.input.tsv.gz"
     output: outFolder + "pisquared_results.tsv"
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.2.0;"
         "Rscript run_pisquared.R -o {outFolder} {input} "
 
 

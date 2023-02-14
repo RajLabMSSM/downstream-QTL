@@ -2,15 +2,15 @@
 # pull entry from GWAS/QTL DB
 pullData <- function(dataset, type = "QTL"){
     message(Sys.time()," * selected dataset: ", dataset)
-    db_path <- "/sc/hydra/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
+    db_path <- "/sc/arion/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx"
 
     message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
     if( type == "GWAS"){
-        n_sheet <- 2
+        n_sheet <- 3
     }
     if( type == "QTL"){
-        n_sheet <- 3
+        n_sheet <- 2
     }
     gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = n_sheet,na= c("", "-","NA")))
 
@@ -33,10 +33,9 @@ extractTargetQTL <- function(qtl, chr ){
     stopifnot( file.exists(qtl$full_path) )
 
     # check whether tabixed with "1" or "chr1"
-    if( qtl$full_chr_type == "1.0" | qtl$full_chr_type == 1  ){
+    if( qtl$full_chrom_type == "1.0" | qtl$full_chrom_type == 1  ){
         chr <- gsub("chr", "", chr)
-    }
-    if( qtl$full_chr_type == "chr1"){
+    }else if( qtl$full_chrom_type == "chr1"){
         if( !grepl("chr", chr) ){
             chr <- paste0("chr", chr)
         }
