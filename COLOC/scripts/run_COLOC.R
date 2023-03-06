@@ -535,7 +535,7 @@ runCOLOC <- function(gwas, qtl, hit){
         purrr::map( q, ~{
             # if QTL has no overlapping SNPs with GWAS summary then return NULL
             if( length(intersect(g$snp, .x$snp) ) == 0 ){ 
-                warning("GWAS and QTL have no SNPs in common")
+                message("Hold up! GWAS and QTL have no SNPs in common")
                 return(NULL) 
             }
             coloc_object <- coloc.abf(dataset1 = g, dataset2 = .x)
@@ -546,6 +546,8 @@ runCOLOC <- function(gwas, qtl, hit){
             coloc_df <- as.data.frame(t(coloc_object$summary), stringsAsFactors = FALSE)
             return( list(df = coloc_df, object = coloc_object) )
         })
+    if( is.null(coloc_res) ){ return(NULL) }
+
     message("       * COLOC finished")
     coloc_df <- map_df(coloc_res, "df", .id = "gene") %>% 
         dplyr::mutate(locus = hit$locus ) %>%
