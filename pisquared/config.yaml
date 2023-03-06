@@ -1,10 +1,7 @@
 datasets:
-    - Frontal_Cortex_NYGC
-    - Cerebellum_NYGC
-#    - Cervical_Spinal_Cord_NYGC
-#    - DLPFC_ROSMAP
-    - GTEX_Brain_Cerebellum
-    - GTEX_Brain_Cortex
-#    - GTEX_Brain_Spinal_cord_cervical_c-1
+    - CMC_editing_EUR
+    - CMC_HBCC_editing_EUR
+    - ROSMAP_batch1_DLPFC_editing_EUR
+    - ROSMAP_batch2_DLPFC_editing_EUR
 outFolder:
-    "test/"
+    "/sc/arion/projects/ad-omics/winston/bigbrain/qtl/Feb23pisquared/CMC_ROSMAP_DLPFC/"
