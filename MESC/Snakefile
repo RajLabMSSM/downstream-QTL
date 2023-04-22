@@ -1,0 +1,36 @@
+
+## MESC Pipeline
+# Jack Humphrey 2023
+
+prefix = config["prefix"]
+qtl = config["qtl_name"]
+sizes = config["size_file"]
+meta = config["meta_file"]
+mesc_path = config["mesc_path"]
+
+rule all:
+   input: "{prefix}.{gwas_name}.h2med" 
+
+
+rule prepare_input:
+    output: "{prefix}.{chr}.input.tsv"
+    params: 
+        script = "scripts/convert_qtl.R"
+    shell:
+        "ml R/4.0.3;"
+        "Rscript {params.script} -c {chr} -q {qtl} -m {meta} -s {sizes} -p {prefix}"
+
+rule mesc_step1:
+    input: "{prefix}.{chr}.input.tsv"
+    output: "{prefix}.{chr}.expscore.gz"   
+    shell:
+        "conda activate mesc;"
+        "python {mesc_path}/run_mesc.py --compute-expscore-sumstat --eqtl-sumstat {input} --out {prefix}.{chr}"   
+
+rule mesc_step2:
+    input: expand(  "{prefix}.{chr}.input.tsv", prefix = prefix, chr = range(0,23) )
+    output: "{prefix}.{gwas_name}.h2med"
+    shell:
+        "conda activate mesc;"
+        "python {mesc_path}/run_mesc.py --h2med {gwas} --exp-chr {prefix} --out {prefix}.{gwas_name} "
+        
