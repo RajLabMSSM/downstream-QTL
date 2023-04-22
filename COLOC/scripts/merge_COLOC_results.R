@@ -178,7 +178,7 @@ calc_LD <- function( x ){
     stopifnot(nrow(x) == length(ld_select) )
     x$LD <- ld_select
     # wait 5 seconds before returning - makes sure API queries are spread out
-    #Sys.sleep(time = 5)
+    Sys.sleep(time = 5)
     return(x)
 }
 

@@ -2,23 +2,32 @@ gwas:
     - Lambert_2013
    # - Marioni_2018
    # - Jansen_2018
-   # - Kunkle_2019
+  #  - Kunkle_2019
     - Bellenguez_2021
-   # - Nalls23andMe_2019
+    - Nalls23andMe_2019
+    - VanRheenenEUR_2021
+    - TrubetskoyEUR_2022
 qtl:
  - Roussos_microglia_caQTL
- - mmQTL_isoseq_expression
+ - mmQTL_union_expression
  - mmQTL_GENCODE_expression 
- - mmQTL_isoseq_transcript
+ - mmQTL_union_transcript
  - mmQTL_GENCODE_transcript
  - mmQTL_GENCODE_leafcutter
- - mmQTL_isoseq_leafcutter
- - mmQTL_isoseq_SUPPA_RI
- #- mmQTL_GENCODE_SUPPA_RI
-# - mmQTL_isoseq_SUPPA_AF
-# - mmQTL_isoseq_SUPPA_AL
-# - mmQTL_GENCODE_SUPPA_AL
-# - mmQTL_GENCODE_SUPPA_AF
+ - mmQTL_union_leafcutter
+ - mmQTL_union_SUPPA_RI
+ - mmQTL_GENCODE_SUPPA_RI
+ - mmQTL_union_SUPPA_AF
+ - mmQTL_union_SUPPA_AL
+ - mmQTL_GENCODE_SUPPA_AL
+ - mmQTL_GENCODE_SUPPA_AF
+ - mmQTL_GENCODE_SUPPA_SE
+ - mmQTL_union_SUPPA_SE
+ - mmQTL_GENCODE_SUPPA_A3
+ - mmQTL_union_SUPPA_A3
+ - mmQTL_GENCODE_SUPPA_A5
+ - mmQTL_union_SUPPA_A5
+
 outFolder: "results/"
 
 geneMeta: "/sc/arion/projects/ad-omics/data/references//hg38_reference/GENCODE/gencode.v38.primary_assembly/gencode.v38.primary_assembly.tx2gene.tsv.gz"

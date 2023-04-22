@@ -1,9 +1,41 @@
 sources:
- - Microglia_mmQTL_GENCODE
- - Microglia_tensorQTL_GENCODE  
+ - mmQTL_GENCODE_expression
+ - mmQTL_isoseq_expression
+ - mmQTL_isoseq_transcript
+ - mmQTL_GENCODE_transcript
+ - mmQTL_isoseq_SUPPA_RI
+ - mmQTL_GENCODE_SUPPA_RI
+ - mmQTL_GENCODE_leafcutter
+ - mmQTL_isoseq_leafcutter
+ - mmQTL_GENCODE_SUPPA_AF
+ - mmQTL_GENCODE_SUPPA_AL
+ - mmQTL_isoseq_SUPPA_AF
+ - mmQTL_isoseq_SUPPA_AL
+ - mmQTL_GENCODE_SUPPA_SE
+ - mmQTL_isoseq_SUPPA_SE
+ - mmQTL_GENCODE_SUPPA_A3
+ - mmQTL_isoseq_SUPPA_A3
+ - mmQTL_GENCODE_SUPPA_A5
+ - mmQTL_isoseq_SUPPA_A5
 targets:
- - Microglia_mmQTL_GENCODE
- - Microglia_tensorQTL_GENCODE
+ - mmQTL_GENCODE_expression
+ - mmQTL_isoseq_expression
+ - mmQTL_isoseq_transcript
+ - mmQTL_GENCODE_transcript
+ - mmQTL_isoseq_SUPPA_RI
+ - mmQTL_GENCODE_SUPPA_RI
+ - mmQTL_GENCODE_leafcutter
+ - mmQTL_isoseq_leafcutter
+ - mmQTL_GENCODE_SUPPA_AF
+ - mmQTL_GENCODE_SUPPA_AL
+ - mmQTL_isoseq_SUPPA_AF
+ - mmQTL_isoseq_SUPPA_AL
+ - mmQTL_GENCODE_SUPPA_SE
+ - mmQTL_isoseq_SUPPA_SE
+ - mmQTL_GENCODE_SUPPA_A3
+ - mmQTL_isoseq_SUPPA_A3
+ - mmQTL_GENCODE_SUPPA_A5
+ - mmQTL_isoseq_SUPPA_A5
 threshold: 0.05
 outFolder:
     "qvalue_res/"
