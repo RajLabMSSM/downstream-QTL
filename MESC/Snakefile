@@ -16,7 +16,7 @@ prefix2 = out_folder + qtl_name + "/" + gwas_name + "/" + qtl_name + "_" + gwas_
 shell.prefix('ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge;')
 
 rule all:
-   input:  prefix2 + ".h2med"
+   input:  prefix2 + ".all.h2med"
 
 rule prepare_input:
     output: "{prefix1}.{chr}.input.tsv"
@@ -37,7 +37,7 @@ rule mesc_step_2:
     input: 
         expand(  prefix1 + ".{chr}.expscore.gz", chr = range(1,23) )
     output: 
-        prefix2 + ".h2med"
+        prefix2 + ".all.h2med"
     shell:
         "conda activate mesc;"
         "python {mesc_path}/run_mesc.py --h2med {gwas} --exp-chr {prefix1} --out {prefix2}"
