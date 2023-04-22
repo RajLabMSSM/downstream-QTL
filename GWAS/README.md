@@ -54,6 +54,8 @@ Once you've entered your GWAS, make sure that you synchronise the GWAS/QTL datab
 
 Jack - at some point work out how to access remote Google Sheet from minerva.
 
+For now, sync_db.sh will copy over your local version of the database to its place on minerva and grant group read permission
+
 
 ## Harmonising summary stats
 

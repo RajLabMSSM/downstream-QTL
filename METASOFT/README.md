@@ -15,3 +15,13 @@ Read in by chromosome or by chunk to keep memory requirements reasonable
 
 run METASOFT on the input file
 
+# Currently runs two meta-analysis methods:
+
+1. METASOFT
+
+2. RE2C
+
+
+# Multiple testing correction
+
+Now implemented, after meta-analysis is run, the P-values for each feature are then corrected for multiple testing using XXX.

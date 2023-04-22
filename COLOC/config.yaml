@@ -28,6 +28,6 @@ qtl:
  - mmQTL_GENCODE_SUPPA_A5
  - mmQTL_union_SUPPA_A5
 
-outFolder: "results/"
+outFolder: "/sc/arion/projects/ad-omics/data/references//QTL/Bryois_brain_cell_eQTls/COLOC/"
 
 geneMeta: "/sc/arion/projects/ad-omics/data/references//hg38_reference/GENCODE/gencode.v38.primary_assembly/gencode.v38.primary_assembly.tx2gene.tsv.gz"

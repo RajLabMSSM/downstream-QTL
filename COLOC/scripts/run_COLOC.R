@@ -90,7 +90,7 @@ extractLoci <- function(gwas){
     # loci are stored either in comma-separated (csv), tab-separated files (txt, tsv) or in excel files (xlsx, xlsm)
     loci_file <- unlist(stringr::str_split(basename(loci_path), "\\."))
     loci_ext <- loci_file[ length(loci_file) ]
-    stopifnot( loci_ext %in% c("csv", "txt", "tsv", "xlsx", "xlsm" ) )
+    stopifnot( loci_ext %in% c("csv", "txt", "tsv", "xlsx", "xlsm", "xls" ) )
     # read in loci file depending on file type
     if( loci_ext == "csv" ){
         loci_df <- readr::read_csv(loci_path)
@@ -98,7 +98,7 @@ extractLoci <- function(gwas){
     if( loci_ext %in% c("txt", "tsv") ){
         loci_df <- readr::read_tsv(loci_path)
     }
-    if( loci_ext %in% c("xlsx", "xlsm") ){
+    if( loci_ext %in% c("xlsx", "xlsm", "xls") ){
         stopifnot( !is.na(gwas$top_sheet) )
         stopifnot( gwas$top_sheet %in% readxl::excel_sheets(loci_path) )
         loci_df <- readxl::read_excel(loci_path, sheet = gwas$top_sheet )
@@ -557,7 +557,7 @@ runCOLOC <- function(gwas, qtl, hit){
         purrr::map( q, ~{
             # if QTL has no overlapping SNPs with GWAS summary then return NULL
             if( length(intersect(g$snp, .x$snp) ) == 0 ){ 
-                warning("GWAS and QTL have no SNPs in common")
+                message("Hold up! GWAS and QTL have no SNPs in common")
                 return(NULL) 
             }
             coloc_object <- coloc.abf(dataset1 = g, dataset2 = .x)
@@ -568,6 +568,8 @@ runCOLOC <- function(gwas, qtl, hit){
             coloc_df <- as.data.frame(t(coloc_object$summary), stringsAsFactors = FALSE)
             return( list(df = coloc_df, object = coloc_object) )
         })
+    if( is.null(coloc_res) ){ return(NULL) }
+
     message("       * COLOC finished")
     coloc_df <- map_df(coloc_res, "df", .id = "gene") %>% 
         dplyr::mutate(locus = hit$locus ) %>%
@@ -643,15 +645,13 @@ maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.
 maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
 
 # load in MAF table
-if( debug == FALSE){
-    if( !exists("maf_1000g") ){
+if( !exists("maf_1000g")){
 
-    maf_1000g <- loadMAF(maf_1000gp3)
-    # load in liftover chain
-    chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
-
+        maf_1000g <- loadMAF(maf_1000gp3)
+        # load in liftover chain
+        chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
     }
-}
+
 main <- function(){
     
         #gwas_dataset <- "Kunkle_2019"
@@ -667,7 +667,8 @@ main <- function(){
     # for testing
     #top_loci <- top_loci[2,]
     if( debug == TRUE){ save.image("debug.RData") }
-  
+ 
+     
     all_coloc <- purrr::map(
         1:nrow(top_loci), ~{
             res <- runCOLOC(gwas, qtl, hit = top_loci[.x,])

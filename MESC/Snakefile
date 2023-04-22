@@ -1,0 +1,44 @@
+
+## MESC Pipeline
+# Jack Humphrey 2023
+
+out_folder = config["out_folder"]
+qtl_name = config["qtl_name"]
+sizes = config["size_file"]
+meta = config["meta_file"]
+mesc_path = config["mesc_path"]
+gwas = config["gwas_path"]
+gwas_name = config["gwas_name"]
+
+prefix1 = out_folder+ qtl_name + "/" + qtl_name 
+prefix2 = out_folder + qtl_name + "/" + gwas_name + "/" + qtl_name + "_" + gwas_name
+
+shell.prefix('ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge;')
+
+rule all:
+   input:  prefix2 + ".h2med"
+
+rule prepare_input:
+    output: "{prefix1}.{chr}.input.tsv"
+    params: 
+        script = "scripts/convert_qtl.R"
+    shell:
+        "ml R/4.0.3;"
+        "Rscript {params.script} -c {wildcards.chr} -q {qtl_name} -m {meta} -s {sizes} -p {prefix1}"
+
+rule mesc_step_1:
+    input: "{prefix1}.{chr}.input.tsv"
+    output: "{prefix1}.{chr}.expscore.gz"   
+    shell:
+        "conda activate mesc;"
+        "python {mesc_path}/run_mesc.py --compute-expscore-sumstat --eqtl-sumstat {input} --out {prefix1}"   
+
+rule mesc_step_2:
+    input: 
+        expand(  prefix1 + ".{chr}.expscore.gz", chr = range(1,23) )
+    output: 
+        prefix2 + ".h2med"
+    shell:
+        "conda activate mesc;"
+        "python {mesc_path}/run_mesc.py --h2med {gwas} --exp-chr {prefix1} --out {prefix2}"
+        
