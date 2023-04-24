@@ -30,7 +30,7 @@ shell.prefix('ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/
 
 rule all:
    input:  
-        expand( out_folder + "{QTL}/MESC/{QTL}_{GWAS}.all.h2med", QTL = qtl_name, GWAS = gwas_name) 
+        expand( out_folder + "{QTL}/MESC/{QTL}.{GWAS}.all.h2med", QTL = qtl_name, GWAS = gwas_name) 
         #prefix2 + ".all.h2med"
 
 rule prepare_input:
@@ -52,10 +52,10 @@ rule mesc_step_2:
     input: 
         expand(  out_folder + "{QTL}/{QTL}.{chr}.expscore.gz", chr = range(1,23), allow_missing = True )
     output:
-        out_folder + "{QTL}/MESC/{QTL}_{GWAS}.all.h2med" 
+        out_folder + "{QTL}/MESC/{QTL}.{GWAS}.all.h2med" 
     run:
         gwas_file = gwas_df.loc[gwas_df['dataset'] == wildcards.GWAS]["full_munged_path"].tolist()[0]
         prefix1 = out_folder + wildcards.QTL + "/" + wildcards.QTL
-        prefix2 = out_folder + wildcards.QTL + "/MESC/" + wildcards.QTL + "_" + wildcards.GWAS
+        prefix2 = out_folder + wildcards.QTL + "/MESC/" + wildcards.QTL + "." + wildcards.GWAS
         shell("conda activate mesc; python {mesc_path}/run_mesc.py --h2med {gwas_file} --exp-chr {prefix1} --out {prefix2}")
         
