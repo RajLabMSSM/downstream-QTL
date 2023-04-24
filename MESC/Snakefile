@@ -1,44 +1,61 @@
 
 ## MESC Pipeline
 # Jack Humphrey 2023
-
+import pandas as pd
 out_folder = config["out_folder"]
-qtl_name = config["qtl_name"]
-sizes = config["size_file"]
-meta = config["meta_file"]
+qtl_name = config["qtl"]
+#sizes = config["size_file"]
+#meta = config["meta_file"]
 mesc_path = config["mesc_path"]
-gwas = config["gwas_path"]
-gwas_name = config["gwas_name"]
+gwas_name = config["gwas"]
 
-prefix1 = out_folder+ qtl_name + "/" + qtl_name 
-prefix2 = out_folder + qtl_name + "/" + gwas_name + "/" + qtl_name + "_" + gwas_name
+#prefix1 = out_folder + qtl_name + "/" + qtl_name 
+#prefix2 = out_folder + qtl_name + "/" + gwas_name + "/" + qtl_name + "_" + gwas_name
+
+# sanity check - can the GWAS and QTL data be found in the database?
+gwas_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references//GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = 2)
+qtl_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references//GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = 1)
+
+gwas_check = all(i in gwas_df["dataset"].tolist() for i in gwas_name )
+qtl_check = all(i in qtl_df["dataset"].tolist() for i in qtl_name )
+
+# write in check for munged sumstats
+
+if not all([gwas_check, qtl_check]):
+    print(" * QTL and/or GWAS cannot be found in database")
+    sys.exit()
+
 
 shell.prefix('ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge;')
 
 rule all:
-   input:  prefix2 + ".all.h2med"
+   input:  
+        expand( out_folder + "{QTL}/MESC/{QTL}_{GWAS}.all.h2med", QTL = qtl_name, GWAS = gwas_name) 
+        #prefix2 + ".all.h2med"
 
 rule prepare_input:
-    output: "{prefix1}.{chr}.input.tsv"
+    output: "{out_folder}/{QTL}/{QTL}.{chr}.input.tsv"
     params: 
         script = "scripts/convert_qtl.R"
     shell:
         "ml R/4.0.3;"
-        "Rscript {params.script} -c {wildcards.chr} -q {qtl_name} -m {meta} -s {sizes} -p {prefix1}"
+        "Rscript {params.script} -c {wildcards.chr} -q {wildcards.QTL} -p {out_folder}/{wildcards.QTL}/{wildcards.QTL}"
 
 rule mesc_step_1:
-    input: "{prefix1}.{chr}.input.tsv"
-    output: "{prefix1}.{chr}.expscore.gz"   
+    input: "{out_folder}/{QTL}/{QTL}.{chr}.input.tsv"
+    output: "{out_folder}/{QTL}/{QTL}.{chr}.expscore.gz"   
     shell:
         "conda activate mesc;"
-        "python {mesc_path}/run_mesc.py --compute-expscore-sumstat --eqtl-sumstat {input} --out {prefix1}"   
+        "python {mesc_path}/run_mesc.py --compute-expscore-sumstat --eqtl-sumstat {input} --out {out_folder}/{wildcards.QTL}/{wildcards.QTL}"   
 
 rule mesc_step_2:
     input: 
-        expand(  prefix1 + ".{chr}.expscore.gz", chr = range(1,23) )
-    output: 
-        prefix2 + ".all.h2med"
-    shell:
-        "conda activate mesc;"
-        "python {mesc_path}/run_mesc.py --h2med {gwas} --exp-chr {prefix1} --out {prefix2}"
+        expand(  out_folder + "{QTL}/{QTL}.{chr}.expscore.gz", chr = range(1,23), allow_missing = True )
+    output:
+        out_folder + "{QTL}/MESC/{QTL}_{GWAS}.all.h2med" 
+    run:
+        gwas_file = gwas_df.loc[gwas_df['dataset'] == wildcards.GWAS]["full_munged_path"].tolist()[0]
+        prefix1 = out_folder + wildcards.QTL + "/" + wildcards.QTL
+        prefix2 = out_folder + wildcards.QTL + "/MESC/" + wildcards.QTL + "_" + wildcards.GWAS
+        shell("conda activate mesc; python {mesc_path}/run_mesc.py --h2med {gwas_file} --exp-chr {prefix1} --out {prefix2}")
         

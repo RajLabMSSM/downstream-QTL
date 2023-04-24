@@ -27,8 +27,8 @@ library(optparse)
 library(tidyverse)
 option_list <- list(
     make_option(c('-q', '--QTL' ), help='The ID of the QTL dataset to use, from the database', default = ""),
-    make_option(c('-m', '--meta'), help = 'The path to the metadata file with coordinates for each feature', default = ""),
-    make_option(c('-s', '--sizes'), help = 'a TSV file of cohort sizes in same order as meta-analysis', default = "" ),
+    #make_option(c('-m', '--meta'), help = 'The path to the metadata file with coordinates for each feature', default = ""),
+    #make_option(c('-s', '--sizes'), help = 'a TSV file of cohort sizes in same order as meta-analysis', default = "" ),
     make_option(c('-c', '--chr'), help = 'which chromosome to process', default = "21"),
     make_option(c('-p', '--prefix'), help = "output prefix") 
 )
@@ -37,14 +37,12 @@ option.parser <- OptionParser(option_list=option_list)
 opt <- parse_args(option.parser)
 
 qtl_name <- opt$QTL
-meta_file <- opt$meta
-size_file <- opt$sizes
+#meta_file <- opt$meta
+#size_file <- opt$sizes
 chr <- opt$chr
 prefix <- opt$prefix
 
 stopifnot(chr %in% 1:22)
-stopifnot(file.exists(size_file) )
-stopifnot(file.exists(meta_file) )
 out_file <- paste0(prefix, ".", chr, ".input.tsv")
 
 
@@ -127,12 +125,18 @@ matchCoords <- function(res, meta_df){
 
 #out_file <- "test_mesc_input.tsv"
 
+qtl <- pullData(qtl_name, type = "QTL")
+
+
+meta_file <- qtl$full_feature_meta
+size_file <- qtl$full_cohort_meta
+
+stopifnot(file.exists(meta_file))
+stopifnot(file.exists(size_file))
 
 
 
 cohort_df <- readr::read_tsv(size_file)
-qtl <- pullData(qtl_name, type = "QTL")
-
 meta_df <- readr::read_tsv(meta_file)
 
 res <- extractQTL(qtl, coord = chr) %>%

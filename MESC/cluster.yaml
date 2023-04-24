@@ -8,3 +8,5 @@ __default__:
   output: logs/{rule}:{wildcards}.stdout
   error: logs/{rule}:{wildcards}.stderr
   himem: ""
+mesc_step_1:
+    mem: 24000
