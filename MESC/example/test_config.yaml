@@ -1,0 +1,9 @@
+mesc_path: "/sc/arion/projects/ad-omics/data/software/mesc"
+
+qtl_name: "mmQTL_GENCODE_expression"
+gwas_name: "Bellenguez_2021"
+gwas_path:  "/sc/arion/projects/ad-omics/ashvin/ldsc_original/munged_ldsc_gwas/Bellenguez_2021_munged.sumstats.gz"
+out_folder: "results/"
+meta_file: "example/gencode.v38.gene_pheno_meta.tsv"
+size_file: "example/test_cohort_sizes.txt"
+
