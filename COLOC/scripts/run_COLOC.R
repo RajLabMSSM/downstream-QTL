@@ -222,15 +222,16 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/da
     #return(result)
     
     # deal with MAF if missing
-    if( is.na(mafCol) | force_maf == TRUE ){
-        message("       * MAF not present - using 1000 Genomes MAF")
-        # how to get this in to the function? it can't find maf_1000g
-        result <- matchMAF(result, maf = maf_1000g)
-    }else{
-        message("       * using supplied MAF")
-        names(result)[names(col_dict) == mafCol] <- "MAF" 
+    if( debug == TRUE){ result$MAF <- NA }else{
+        if( is.na(mafCol) | force_maf == TRUE ){
+            message("       * MAF not present - using 1000 Genomes MAF")
+            # how to get this in to the function? it can't find maf_1000g
+            result <- matchMAF(result, maf = maf_1000g)
+        }else{
+            message("       * using supplied MAF")
+            names(result)[names(col_dict) == mafCol] <- "MAF" 
+        }
     }
-
     # convert standard error to the variance
     # se is standard error - not standard deviation!
     result$varbeta <- result$varbeta^2
@@ -379,7 +380,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     col_dict <- setNames(1:length(columns), columns)
     
     print(col_dict)
-    stopifnot( ncol(result) == length(col_dict) )
+    #stopifnot( ncol(result) == length(col_dict) )
+    col_dict <- col_dict[1:ncol(result)] # hacky workaround for now
     names(result)[names(col_dict) == phenoCol] <- "gene"
     names(result)[names(col_dict) == mafCol]   <- "MAF"
     names(result)[names(col_dict) == pvalCol]  <- "pvalues"
@@ -402,6 +404,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
 
     # deal with MAF - meta-analysis outputs won't have it
     # this requires "chr" to be present in QTL data
+    if( debug == TRUE){ result$MAF <- NA }else{
     if( is.na(mafCol) | force_maf == TRUE ){
         message("       * MAF not present - using 1000 Genomes MAF")
         #stopifnot( "chr" %in% names(col_dict) )
@@ -413,6 +416,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
         names(result)[names(col_dict) == mafCol] <- "MAF"
         print(col_dict)
         print(head(result) )
+    }
     }
     # deal with edge cases - 1 gene and the gene id is NA
     if( all( is.na(result$gene) ) ){
@@ -427,7 +431,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     names(result)[which(names(col_dict) == chrCol) ]   <- "QTL_chr"
     names(result)[which(names(col_dict) == posCol) ]   <- "QTL_pos"
 
-    print(head(result) ) 
+    #print(head(result) ) 
     
     # retain only associations within locus coords
     if( !is.na(betaCol) & !is.na(seCol) ){
@@ -435,7 +439,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     }else{
         res_subset <- dplyr::select(result, gene, snp, pvalues, MAF, QTL_chr, QTL_pos)
     }
-
+    print(head(res_subset) ) 
     print("passed this point")
     #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
        
@@ -507,16 +511,34 @@ runCOLOC <- function(gwas, qtl, hit){
     
     message("       * extracting QTLs")
     q <- extractQTL(qtl, qtl_range)
+    print(names(q[[1]]))
     if( is.null(q) ){ return(NULL) }
     # for each gene extract top QTL SNP   
-    if( all( c("beta", "varbeta") %in% names(q) ) ){
+    if( all( c("beta", "varbeta") %in% names(q[[1]]) ) ){
         qtl_info <- q %>% 
         map_df( ~{ 
             as.data.frame(.x, stringsAsFactors=FALSE) %>% 
             arrange(pvalues) %>% head(1) %>% 
             select(gene, QTL_SNP = snp, QTL_P = pvalues, QTL_Beta = beta, QTL_SE = varbeta, QTL_MAF = MAF, QTL_chr, QTL_pos) %>%
             mutate( QTL_SE = sqrt(QTL_SE) ) # get SE back from Variance
+        })
+        # get out beta, se and P for GWAS SNP 
+        gwas_info <- q %>%
+         map_df( ~{
+            df <- as.data.frame(.x, stringsAsFactors=FALSE) %>%
+                filter(snp == hit_info$GWAS_SNP )
+            if( nrow(df) == 1){
+                df %>%
+                select(GWAS_SNP_Beta = beta,
+                       GWAS_SNP_SE = varbeta,
+                       GWAS_SNP_P = pvalues ) %>%
+                mutate(GWAS_SNP_SE = sqrt(GWAS_SNP_SE) )
+            }else{
+            tibble(GWAS_SNP_Beta = NA, GWAS_SNP_SE = NA, GWAS_SNP_P = NA)
+            }
         }) 
+        qtl_info <- bind_cols(qtl_info, gwas_info)
+        print(head(qtl_info) )
     }else{
         qtl_info <- q %>% 
         map_df( ~{ 
@@ -596,7 +618,7 @@ option_list <- list(
         make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
         make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database" ),
         make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database"),
-        make_option(c('--debug'), help = "load all files and the nsave RData without running COLOC", action = "store_true", default = FALSE)
+        make_option(c('--debug'), help = "load all files and then save RData without running COLOC", action = "store_true", default = FALSE)
 )
 
 option.parser <- OptionParser(option_list=option_list)

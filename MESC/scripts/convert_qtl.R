@@ -27,8 +27,8 @@ library(optparse)
 library(tidyverse)
 option_list <- list(
     make_option(c('-q', '--QTL' ), help='The ID of the QTL dataset to use, from the database', default = ""),
-    make_option(c('-m', '--meta'), help = 'The path to the metadata file with coordinates for each feature', default = ""),
-    make_option(c('-s', '--sizes'), help = 'a TSV file of cohort sizes in same order as meta-analysis', default = "" ),
+    #make_option(c('-m', '--meta'), help = 'The path to the metadata file with coordinates for each feature', default = ""),
+    #make_option(c('-s', '--sizes'), help = 'a TSV file of cohort sizes in same order as meta-analysis', default = "" ),
     make_option(c('-c', '--chr'), help = 'which chromosome to process', default = "21"),
     make_option(c('-p', '--prefix'), help = "output prefix") 
 )
@@ -37,14 +37,12 @@ option.parser <- OptionParser(option_list=option_list)
 opt <- parse_args(option.parser)
 
 qtl_name <- opt$QTL
-meta_file <- opt$meta
-size_file <- opt$sizes
+#meta_file <- opt$meta
+#size_file <- opt$sizes
 chr <- opt$chr
 prefix <- opt$prefix
 
 stopifnot(chr %in% 1:22)
-stopifnot(file.exists(size_file) )
-stopifnot(file.exists(meta_file) )
 out_file <- paste0(prefix, ".", chr, ".input.tsv")
 
 
@@ -120,6 +118,25 @@ matchCoords <- function(res, meta_df){
     return(res)
 }
 
+standardiseCols <- function(res, qtl){
+    names(res)[ names(res) == qtl$full_pheno ] <- "feature"
+    names(res)[ names(res) == qtl$full_snp ] <- "variant_id"   
+    names(res)[ names(res) == qtl$full_chrom ] <- "chr"
+    names(res)[ names(res) == qtl$full_pos ] <- "pos"
+    names(res)[ names(res) == qtl$full_effect ] <- "beta"
+    names(res)[ names(res) == qtl$full_se ] <- "se"
+    return(res)
+}
+
+calcZ <- function(res){
+    if("Random_Z" %in% names(res) ){
+        res$Z <- res$Random_Z
+    }else{
+        res$Z <- res$beta / res$se 
+    }
+    return(res)
+}
+
 #test_coord <- "chr21"
 #qtl_name <- "mmQTL_GENCODE_expression"
 #meta_file <- "/hpc/users/humphj04/pipelines/downstream-QTL/MESC/example/gencode.v38.gene_pheno_meta.tsv"
@@ -127,20 +144,49 @@ matchCoords <- function(res, meta_df){
 
 #out_file <- "test_mesc_input.tsv"
 
-
-
-
-cohort_df <- readr::read_tsv(size_file)
 qtl <- pullData(qtl_name, type = "QTL")
+# load in QTLs
+res <- extractQTL(qtl, coord = chr)
+print(head(res))
+# standardise column names 
+res <- standardiseCols(res,qtl)
+print(head(res))
+
+## feature coordinates - use GENCODE v30 gene coordinates by default
+if( is.na(qtl$full_feature_meta) ){
+    meta_file <- "/sc/arion/projects/ad-omics/data/references/hg38_reference/GENCODE/gencode.v30.genes.tsv"
+}else{
+    meta_file <- qtl$full_feature_meta
+}
+stopifnot(file.exists(meta_file))
+
+# if QTL comes from meta-analysis then you require a cohort sizes file
+# otherwise use N provided
+if( !is.na(qtl$full_cohort_meta) ){
+
+    size_file <- qtl$full_cohort_meta
+    stopifnot(file.exists(size_file))
+    cohort_df <- readr::read_tsv(size_file)
+
+    res <- getCohortSize(res,cohort_df)
+}else{
+    stopifnot(!is.na(qtl$N ) )
+    res$N <- qtl$N
+}
+
+print(head(res))
 
 meta_df <- readr::read_tsv(meta_file)
 
-res <- extractQTL(qtl, coord = chr) %>%
-    getCohortSize(cohort_df) %>%
+res <- res  %>%
     matchCoords(meta_df) %>%
-    select(GENE = feature, GENE_COORD, SNP = variant_id, CHR = chr, SNP_COORD = pos, N, Z = Random_Z ) %>%
+    calcZ() %>%
+    select(GENE = feature, GENE_COORD, SNP = variant_id, CHR = chr, SNP_COORD = pos, N, Z ) %>%
     arrange(GENE, SNP_COORD) %>%
     mutate(CHR = gsub("chr", "", CHR) )
+
+print(head(res))
+
 
 write_tsv(res, out_file)
 

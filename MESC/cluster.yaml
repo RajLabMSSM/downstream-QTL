@@ -8,3 +8,6 @@ __default__:
   output: logs/{rule}:{wildcards}.stdout
   error: logs/{rule}:{wildcards}.stderr
   himem: ""
+prepare_input:
+    mem: 64000
+    himem: "-R himem"
