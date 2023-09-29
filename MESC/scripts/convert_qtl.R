@@ -114,7 +114,23 @@ getCohortSize <- function(res, cohort_df){
 
 matchCoords <- function(res, meta_df){
     meta_df$coord <- meta_df$start + floor((meta_df$end - meta_df$start)/2)
-    res$GENE_COORD <- meta_df$coord[match(res$feature, meta_df$feature)]
+    
+    # deal with sQTLs
+    if( sum(grepl(":", res$feature)) > 0 ){
+        if( sum(grepl("clu_", res$feature) > 0) ){
+            res$gene <- str_split_fixed(res$feature, ":", 5)[,5]
+        }else{
+            res$gene <- str_split_fixed(res$feature, ":", 4)[,4]
+        }
+        res$GENE_COORD <- meta_df$coord[match(res$gene, meta_df$feature)]
+    }else{
+
+        # edge case - some sumstats have ensembl IDs without tag numbers
+        if( sum(res$feature %in% meta_df$feature ) == 0 ){
+            meta_df$feature <- gsub("\\.[0-9]+","", meta_df$feature )
+        }
+        res$GENE_COORD <- meta_df$coord[match(res$feature, meta_df$feature)]
+    }
     return(res)
 }
 
@@ -125,6 +141,10 @@ standardiseCols <- function(res, qtl){
     names(res)[ names(res) == qtl$full_pos ] <- "pos"
     names(res)[ names(res) == qtl$full_effect ] <- "beta"
     names(res)[ names(res) == qtl$full_se ] <- "se"
+    # weird edge case where there are two separate chr columns with different names
+    if( sum(names(res) == "chr" ) > 1 ){
+        res <- res[, -which(names(res) == "chr")[1] ]
+    }
     return(res)
 }
 
@@ -179,12 +199,19 @@ print(head(res))
 meta_df <- readr::read_tsv(meta_file)
 
 res <- res  %>%
-    matchCoords(meta_df) %>%
-    calcZ() %>%
+    matchCoords(meta_df) 
+print(head(res))
+res <- res %>%
+    calcZ() 
+print(head(res))
+
+res <- res %>%
     select(GENE = feature, GENE_COORD, SNP = variant_id, CHR = chr, SNP_COORD = pos, N, Z ) %>%
     arrange(GENE, SNP_COORD) %>%
-    mutate(CHR = gsub("chr", "", CHR) )
+    mutate(CHR = gsub("chr", "", CHR) ) %>%
+    drop_na()
 
+stopifnot( nrow(res) > 0)
 print(head(res))
 
 
