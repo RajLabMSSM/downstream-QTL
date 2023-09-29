@@ -58,4 +58,3 @@ rule mesc_step_2:
         prefix1 = out_folder + wildcards.QTL + "/" + wildcards.QTL
         prefix2 = out_folder + wildcards.QTL + "/MESC/" + wildcards.QTL + "." + wildcards.GWAS
         shell("conda activate mesc; python {mesc_path}/run_mesc.py --h2med {gwas_file} --exp-chr {prefix1} --out {prefix2}")
-        
