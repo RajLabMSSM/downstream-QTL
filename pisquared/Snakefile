@@ -8,7 +8,9 @@ outFolder = config["outFolder"]
 
 dataset_string = outFolder + dataset_string
 
-chromosomes = list(range(1,23))
+#chromosomes = list(range(1,23))
+# restrict to chromosome 1 to speed things up
+chromosomes = 1
 
 rule all:
     input:

@@ -4,4 +4,4 @@ datasets:
     - ROSMAP_batch1_DLPFC_editing_EUR
     - ROSMAP_batch2_DLPFC_editing_EUR
 outFolder:
-    "/sc/arion/projects/ad-omics/winston/bigbrain/qtl/Feb23pisquared/CMC_ROSMAP_DLPFC/"
+    "pisquared_results/"

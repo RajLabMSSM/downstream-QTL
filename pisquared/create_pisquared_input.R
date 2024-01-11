@@ -55,13 +55,13 @@ extractTargetQTL <- function(qtl, chr ){
         return(NULL)
     }
     # rename columns 
-     stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_beta, qtl$full_se, qtl$full_maf, qtl$N, qtl$build) ) ))
+     stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$full_effect, qtl$full_se, qtl$N, qtl$build) ) ))
     pvalCol <- qtl$full_p
-    betaCol <- qtl$full_beta
+    betaCol <- qtl$full_effect
     phenoCol <- qtl$full_pheno
     seCol <- qtl$full_se
     snpCol <- qtl$full_snp
-    mafCol <- qtl$full_maf
+    #mafCol <- qtl$full_maf
     if(is.null(result) ){ return(NULL) }
 
     cmd <- paste( "zless ", qtl$full_path, " | head -1 " )
@@ -130,7 +130,7 @@ qtl_list <- purrr::map(data_list, pullData, type = "QTL" )
 
 prefix <- paste( data_list, collapse = "-" )
 
-outFile_final <- file.path(outFolder, paste0( prefix, ".metasoft.input.tsv" ) )
+#outFile_final <- file.path(outFolder, paste0( prefix, ".metasoft.input.tsv" ) )
 # if chromosome is specified then just read in from that chromosome
 # else iterate through all
 
