@@ -90,6 +90,8 @@ extractGWAS <- function(gwas, chr, refFolder = "/sc/arion/projects/ad-omics/data
     names(result)[names(col_dict) == a1Col] <- "A1"
     names(result)[names(col_dict) == a2Col] <- "A2"
 
+    result$p <- as.numeric(result$p)
+
     return(result)
 }
 
