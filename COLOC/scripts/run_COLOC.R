@@ -32,24 +32,36 @@ suppressPackageStartupMessages(library(rtracklayer))
 # flank coordinates by set number of bases (default 1MB)
 # work on either a coordinate string or a dataframe containing chr start and end columns
 joinCoords <- function(input, flank = 0){
-    if(all(class(input) == "character")){
-        coord <- splitCoords(input)
-        coord$start <- coord$start - flank
-        coord$end <- coord$end + flank
-        coord <- paste0(coord$chr, ":", coord$start, "-", coord$end)    
-        return(coord)
+  if(all(class(input) == "character")){
+    coord <- splitCoords(input)
+    coord$start <- coord$start - flank
+    coord$end <- coord$end + flank
+    if(coord$start < 0 ){
+      coord <- paste0(coord$chr, ":", "0", "-", coord$end)    
+    }else{
+      coord <- paste0(coord$chr, ":", coord$start, "-", coord$end)    
     }
-    if( "data.frame" %in% class(input)){
-        stopifnot( all(c("chr", "start", "end") %in% names(input) ) | all(c("chr","pos") %in% names(input) )  )
-        stopifnot( flank >= 0)
-        if( all( c("chr","start","end") %in% names(input) ) ){
-            coords <- paste0(input$chr, ":", input$start - flank, "-",input$end + flank) 
-        }
-        if( all( c("chr", "pos") %in% names(input) ) ){
-            coords <- paste0(input$chr, ":", input$pos - (flank + 1), "-", input$pos + flank)
-        }
-        return(coords)
+    return(coord)
+  }
+  if( "data.frame" %in% class(input)){
+    stopifnot( all(c("chr", "start", "end") %in% names(input) ) | all(c("chr","pos") %in% names(input) )  )
+    stopifnot( flank >= 0 )
+    if( all( c("chr","start","end") %in% names(input) ) ){
+      if((as.numeric(input$start) - flank) < 0 ){
+        coords <- paste0(input$chr, ":", "0", "-",input$end + flank) 
+      }else{
+        coords <- paste0(input$chr, ":", input$start - flank, "-",input$end + flank) 
+      }
     }
+    if( all( c("chr", "pos") %in% names(input) ) ){
+      if((as.numeric(input$pos) - (flank + 1)) < 0 ){
+        coords <- paste0(input$chr, ":", "0", "-", input$pos + flank)
+      }else{
+        coords <- paste0(input$chr, ":", input$pos - (flank + 1), "-", input$pos + flank) 
+      }
+    }
+    return(coords)
+  }
 }
 
 splitCoords <- function(coords){
