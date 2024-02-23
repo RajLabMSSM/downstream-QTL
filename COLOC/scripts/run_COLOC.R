@@ -455,65 +455,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     return(res_split)
 }
 
-       
-
-
-# running COLOC between a GWAS locus and all eQTLs within 1MB either side
-# flank coordinates
-# extract GWAS nominal SNPs from region
-# find GWAS hit SNP for recording
-# extract QTLs within range - at set significance level
-# join together and run COLOC
-# output a list of objects:
-## COLOC results - this should include the GWAS locus, the gene of interest, the top QTL variant and the top QTL p-value
-## object - this should be a table combining the two input datasets, inner joined on "snp", to be used for plotting.
-runCOLOC <- function(gwas, qtl, hit){
-    message(" * Analysing LOCUS: ", hit$locus )
-    # hit is a dataframe containing "snp", "chr", "pos", "locus"
-    
-    hit_coord <- joinCoords(hit, flank = 0)
-    hit_range <- joinCoords(hit, flank = 1e6)
- 
-    # extract GWAS and QTL summary for given coord
-    message("       * extracting GWAS")
-    g <- extractGWAS(gwas, hit_range)
-    # get hit info from GWAS
-    hit_snp <- hit$snp
-    # this assumes that the hit SNP is within the g object
-    # if the top hit doesn't have an RSID or cannot be MAF matched then this is violated
-    # I will have to use the hit object instead and accept that not all top_loci lists include the MAF, P value etc.
-    #if( hit_snp == hit$snp ){
-    #hit_info <- as.data.frame(g, stringsAsFactors = FALSE) %>% filter(snp == hit_snp) %>% 
-    #            select(GWAS_SNP = snp, GWAS_P = pvalues, GWAS_effect_size = beta, GWAS_MAF = MAF) %>%
-    #            mutate(locus = hit$locus) %>% select(locus, everything() )
-    #}else{
-    # now just use top loci
-   
-    # problem when no p column in hit!
-
-    hit_info <- hit %>%
-            select(locus, GWAS_SNP = snp, GWAS_P = p)
-    #}
- 
-    # if GWAS is hg19 then lift over to hg38
-    # use the lifted over position in hit_info
-    if(gwas$build != qtl$build){
-        qtl_coord <- liftOverCoord(hit_coord, from = gwas$build, to = qtl$build)
-    }else{
-        qtl_coord <- hit_coord
-    }
-    # record the position of the GWAS top SNP
-    hit_info$GWAS_chr <- splitCoords(qtl_coord)$chr
-    hit_info$GWAS_pos <- splitCoords(qtl_coord)$end
-
-
-    qtl_range <- joinCoords(qtl_coord, flank = 1e6)
-    
-    message("       * extracting QTLs")
-    q <- extractQTL(qtl, qtl_range)
-    print(names(q[[1]]))
-    if( is.null(q) ){ return(NULL) }
-    # for each gene extract top QTL SNP   
+# for each gene extract top QTL SNP   
+getQTLinfo <- function(q, hit_info){  
     if( all( c("beta", "varbeta") %in% names(q[[1]]) ) ){
         qtl_info <- q %>% 
         map_df( ~{ 
@@ -548,14 +491,79 @@ runCOLOC <- function(gwas, qtl, hit){
         }) 
 
     }
+    return(qtl_info)
+}      
+
+
+# running COLOC between a GWAS locus and all eQTLs within 1MB either side
+# flank coordinates
+# extract GWAS nominal SNPs from region
+# find GWAS hit SNP for recording
+# extract QTLs within range - at set significance level
+# join together and run COLOC
+# output a list of objects:
+## COLOC results - this should include the GWAS locus, the gene of interest, the top QTL variant and the top QTL p-value
+## object - this should be a table combining the two input datasets, inner joined on "snp", to be used for plotting.
+## sig.level now filters out QTLs with P > sig.level
+runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL){
+    message(" * Analysing LOCUS: ", hit$locus )
+    # hit is a dataframe containing "snp", "chr", "pos", "locus"
+    
+    hit_coord <- joinCoords(hit, flank = 0)
+    hit_range <- joinCoords(hit, flank = 1e6)
+ 
+    # extract GWAS and QTL summary for given coord
+    message("       * extracting GWAS")
+    g <- extractGWAS(gwas, hit_range)
+    # get hit info from GWAS
+    hit_snp <- hit$snp
+  
+    # problem when no p column in hit!
+
+    hit_info <- hit %>%
+            select(locus, GWAS_SNP = snp, GWAS_P = p)
+    # if GWAS is hg19 then lift over to hg38
+    if(gwas$build != qtl$build){
+        qtl_coord <- liftOverCoord(hit_coord, from = gwas$build, to = qtl$build)
+    }else{
+        qtl_coord <- hit_coord
+    }
+    # record the position of the GWAS top SNP
+    hit_info$GWAS_chr <- splitCoords(qtl_coord)$chr
+    hit_info$GWAS_pos <- splitCoords(qtl_coord)$end
+    qtl_range <- joinCoords(qtl_coord, flank = 1e6)
+    
+    message("       * extracting QTLs")
+    q <- extractQTL(qtl, qtl_range)
+    print(names(q[[1]]))
+    if( is.null(q) ){ return(NULL) }
+    qtl_info <- getQTLinfo(q, hit_info)
+     # if sig filtering requested
+    if( !is.null(sig.level ) ){
+        qtl_info <- filter(qtl_info, QTL_P < sig.level)
+        q <- q[ qtl_info$gene ] 
+         message(" * ", length(q), " features in QTL")
+    }
+
+    if( !is.null(qtl2) ){
+        # if second QTL dataset requested
+        q2 <- extractQTL(qtl2, qtl_range)
+        if( is.null(q2) ){ return(NULL) }
+        qtl2_info <- getQTLinfo(q2, hit_info)
+        if( !is.null(sig.level ) ){
+            qtl2_info <- filter(qtl2_info, QTL_P < sig.level)
+            q2 <- q2[ qtl2_info$gene ]
+        }
+        message(" * ", length(q2), " features in QTL 2")
+    }
     # actually run COLOC
     message("      * running COLOC")
-    
-    # run COLOC on each QTL gene 
     # return the results table and an object containing g and q
+    # GWAS-QTL COLOC
+    if( is.null(qtl2) ){
+    message(" * GWAS-QTL COLOC")
     coloc_res <- 
         purrr::map( q, ~{
-            # if QTL has no overlapping SNPs with GWAS summary then return NULL
             if( length(intersect(g$snp, .x$snp) ) == 0 ){ 
                 message("Hold up! GWAS and QTL have no SNPs in common")
                 return(NULL) 
@@ -564,10 +572,41 @@ runCOLOC <- function(gwas, qtl, hit){
             # add in g and q to coloc object
             gq <- dplyr::inner_join(as.data.frame(g),as.data.frame(.x), by = "snp", suffix = c(".gwas", ".qtl") )
             coloc_object$results <- dplyr::inner_join(coloc_object$results, gq, by = "snp" )
-            # pull out coloc summary as data.frame
             coloc_df <- as.data.frame(t(coloc_object$summary), stringsAsFactors = FALSE)
             return( list(df = coloc_df, object = coloc_object) )
         })
+    }else{
+    message(" * QTL-QTL COLOC")
+    # remove features with lead SNPs > 1e-5
+    # test all pairs of QTL features in the locus
+    qtl_combos <- expand.grid(1:length(q), 1:length(q2) )
+    message(" * testing ", nrow(qtl_combos), " pairs of QTLs")
+    # qtl_info is matched on to COLOC results using gene names - but for QTL-QTL there are two genes, so instead use the index of the pair
+    qtl_info <- 
+        full_join( 
+            qtl_info[qtl_combos$Var1,] %>% mutate(index = 1:nrow(qtl_combos) ), 
+            qtl2_info[qtl_combos$Var2,] %>% mutate(index = 1:nrow(qtl_combos) ), 
+            by = "index", 
+            suffix = c(".qtl1", ".qtl2") ) %>%
+            dplyr::mutate(gene = as.character(index)) %>%
+            select(-index)
+
+    coloc_res <- 
+        purrr::map( 1:nrow(qtl_combos), ~{
+            q_1 = q[[ qtl_combos[.x, "Var1"] ]]
+            q_2 = q2[[ qtl_combos[.x, "Var2"] ]]
+            message( " * ", .x, ": ", unique(q_1$gene), " vs ",  unique(q_2$gene) )
+             if( length(intersect(q_1$snp, q_2$snp) ) == 0 ){
+                message("Hold up! GWAS and QTL have no SNPs in common")
+                return(NULL)
+            }
+            coloc_object <- coloc.abf(dataset1 = q_1, dataset2 = q_2)
+            qq <- dplyr::inner_join(as.data.frame(q_1),as.data.frame(q_2), by = "snp", suffix = c(".qtl1", ".qtl2") )
+            coloc_object$results <- dplyr::inner_join(coloc_object$results, qq, by = "snp" )
+            coloc_df <- as.data.frame(t(coloc_object$summary), stringsAsFactors = FALSE)
+            return( list(df = coloc_df, object = coloc_object) )
+        })
+    }
     if( is.null(coloc_res) ){ return(NULL) }
 
     message("       * COLOC finished")
@@ -578,7 +617,8 @@ runCOLOC <- function(gwas, qtl, hit){
     # bind coloc_res to other tables
     full_res <- full_join(qtl_info, coloc_df, by = "gene")
     full_res <- full_join(hit_info, full_res, by = "locus")
-
+    # remove rows with no coloc run
+    full_res <- filter(full_res, !is.na(PP.H4.abf) )
     # add pairwise LD between GWAS and QTL SNP
     #full_res <- calc_LD(full_res)
 
@@ -618,6 +658,8 @@ option_list <- list(
         make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
         make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database" ),
         make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database"),
+        make_option(c('--qtl2', '-r'), help = "a second QTL dataset - using this will trigger QTL-QTL COLOC", default = NULL),
+        make_option(c('--sig', '-s'), help = "the minimum p-value a QTL should have for testing", default = NULL),
         make_option(c('--debug'), help = "load all files and then save RData without running COLOC", action = "store_true", default = FALSE)
 )
 
@@ -628,50 +670,41 @@ opt <- parse_args(option.parser)
 outFolder <- opt$outFolder
 gwas_dataset <- opt$gwas
 qtl_dataset <- opt$qtl
+qtl_dataset_2 <- opt$qtl2
 debug <- opt$debug
-#gwas_prefix <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
-#qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30"
-#qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_splicing/peer20/LumbarSpinalCord_splicing_peer20"
+sig <- opt$sig
 
-#hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
-#outFile <- "test_coloc_results.tsv"
-
-#options(echo = TRUE)
-
-# load in data
-# extract top GWAS loci
-# for each locus run COLOC
-maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
+#maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
 maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
 
-# load in MAF table
-if( !exists("maf_1000g")){
-
-        maf_1000g <- loadMAF(maf_1000gp3)
-        # load in liftover chain
-        chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
-    }
 
 main <- function(){
-    
-        #gwas_dataset <- "Kunkle_2019"
-    #gwas_dataset <- "Nalls23andMe_2019"
     #gwas_dataset <- "Marioni_2018"
     #qtl_dataset <- "Microglia_THA"
     
     gwas <- pullData(gwas_dataset, "GWAS")
     qtl <- pullData(qtl_dataset, "QTL")
     
+    if( !is.null(qtl_dataset_2) ){
+        qtl2 <- pullData(qtl_dataset_2, "QTL")
+    }
+    
     top_loci <- extractLoci(gwas)
     
-    # for testing
-    #top_loci <- top_loci[2,]
+
+    # load in MAF table
+    if( !exists("maf_1000g")){
+
+        maf_1000g <- loadMAF(maf_1000gp3)
+        # load in liftover chain
+        chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
+    }
+
     if( debug == TRUE){ save.image("debug.RData") }
  
-     
     all_coloc <- purrr::map(
         1:nrow(top_loci), ~{
-            res <- runCOLOC(gwas, qtl, hit = top_loci[.x,])
+            res <- runCOLOC(gwas, qtl, qtl2, hit = top_loci[.x,], sig.level = sig)
             if(is.null(res) ){return(NULL) }
             return(res)
         }
@@ -679,16 +712,18 @@ main <- function(){
     all_res <- map_df(all_coloc, "full_res")
     all_obj <- map(all_coloc, "coloc_object")    
     names(all_obj) <- top_loci$locus
-    
-    
-    # arrange by H4
     all_res <- arrange(all_res, desc(PP.H4.abf)  )
     
     outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_COLOC.tsv")
+    if( !is.null(qtl_dataset_2)){
+        outFile <- paste0(outFolder, qtl_dataset, "_", qtl_dataset_2, "_", gwas_dataset, "_COLOC.tsv")
+    }    
+
     readr::write_tsv(all_res, path = outFile)
     # save COLOC objects for plotting
     save(all_obj, file = gsub("tsv", "RData", outFile))
 }
 
 main()
+
 
