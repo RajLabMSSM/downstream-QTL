@@ -7,15 +7,21 @@ outFolder = config["outFolder"]
 geneMeta = config["geneMeta"]
 
 # sanity check - can the GWAS and QTL data be found in the database?
-gwas_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references//GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = 2)
-qtl_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references//GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = 1)
+gwas_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references//GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = 1)
+qtl_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references//GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = 2)
 
 gwas_check = all(i in gwas_df["dataset"].tolist() for i in gwas_data )
 qtl_check = all(i in qtl_df["dataset"].tolist() for i in qtl_data )
 
-if not all([gwas_check, qtl_check]):
-    print(" * QTL and/or GWAS cannot be found in database")
+if not all([gwas_check]):
+    print(" * GWAS cannot be found in database")
     sys.exit()
+
+if not all([qtl_check]):
+    print(" * QTL cannot be found in database")
+    print(qtl_check)
+    sys.exit()
+
 
 shell.prefix("export PS1=""; ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate snakemake;")
 rule all:
@@ -23,6 +29,7 @@ rule all:
         #expand(outFolder + "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz", GWAS = gwas_data, QTL = qtl_data)
         outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz",
         outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz",
+        outFolder + "pairwise_QTL_results.tsv.gz"
         #expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
         #outFolder + "all_COLOC_summary_results.tsv.gz"
 
@@ -46,7 +53,7 @@ rule merge_COLOC_snp_level:
     params:
         script = "scripts/merge_COLOC_results.R"
     shell:
-        "ml R/4.0.3;"
+        "ml R/3.6.0;" # LDLINKR only installed on 3.6
         "Rscript {params.script} --threshold 0 --inFolder {outFolder} --geneMeta {geneMeta};" 
         "Rscript {params.script} --threshold 0.5 --ld --inFolder {outFolder} --geneMeta {geneMeta} "
 
@@ -61,3 +68,25 @@ rule create_LD_tables:
     shell:
        "conda activate echoR;"
        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} --inFile {input} --outFolder {params.out}" 
+
+rule prepare_QTL_COLOC:
+    input:
+        outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz"
+    output:
+        outFolder + "pairwise_QTL_COLOC_targets.tsv.gz"
+    params:
+        script = "scripts/prepare_pairwise_qtl_coloc.R"
+    shell:
+        "ml R/4.2.0;"
+        "Rscript {params.script} -i {input} -o {output} -m across -p 0.8"
+
+rule run_QTL_COLOC:
+    input:
+        outFolder + "pairwise_QTL_COLOC_targets.tsv.gz"
+    output:
+        outFolder + "pairwise_QTL_results.tsv.gz"
+    params:
+        script = "scripts/run_COLOC.R"
+    shell:
+        "ml R/4.2.0;"
+        "Rscript {params.script} -t {input} -o {output}"

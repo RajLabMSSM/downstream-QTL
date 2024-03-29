@@ -36,6 +36,7 @@ joinCoords <- function(input, flank = 0){
         coord <- splitCoords(input)
         coord$start <- coord$start - flank
         coord$end <- coord$end + flank
+        if( coord$start < 0){coord$start <- 0}
         coord <- paste0(coord$chr, ":", coord$start, "-", coord$end)    
         return(coord)
     }
@@ -155,7 +156,7 @@ matchMAF <- function(data, maf){
     # match on RSID
     message("   * before joining MAF: ", nrow(data), " SNPs")
     data$MAF <- maf$MAF[match(data$snp, maf$snp)]
-    matched <- data[ !is.na(data$MAF) ,]
+    matched <- data[ !is.na(data$MAF) & data$MAF >0 & data$MAF < 1,]
     message("   * after joining MAF: ", nrow(matched), " SNPs")
     if(nrow(matched) == 0 ){
         print(head(data) )
@@ -222,7 +223,6 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/da
     #return(result)
     
     # deal with MAF if missing
-    if( debug == TRUE){ result$MAF <- NA }else{
         if( is.na(mafCol) | force_maf == TRUE ){
             message("       * MAF not present - using 1000 Genomes MAF")
             # how to get this in to the function? it can't find maf_1000g
@@ -231,11 +231,10 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/da
             message("       * using supplied MAF")
             names(result)[names(col_dict) == mafCol] <- "MAF" 
         }
-    }
     # convert standard error to the variance
     # se is standard error - not standard deviation!
     result$varbeta <- result$varbeta^2
-    print(head(result))
+    #print(head(result))
     #save.image("debug.RData") 
     result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos, A1, A2)
     
@@ -348,7 +347,7 @@ extractQTL_tabix <- function(qtl, coord){
 # extract all nominal QTL P-values overlapping the flanked GWAS hit
 # split by Gene being tested
 # sig_level doesn't do anything yet
-extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
+extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets = NULL){
     # variables stored in qtl
     # if qtl type is parquet then read in parquet files
     # if qtl type is tabix then query the coordinates through tabix 
@@ -379,7 +378,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     columns <- colnames(data.table::fread( cmd = cmd ))
     col_dict <- setNames(1:length(columns), columns)
     
-    print(col_dict)
+    #print(col_dict)
     #stopifnot( ncol(result) == length(col_dict) )
     col_dict <- col_dict[1:ncol(result)] # hacky workaround for now
     names(result)[names(col_dict) == phenoCol] <- "gene"
@@ -410,12 +409,12 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
         #stopifnot( "chr" %in% names(col_dict) )
         names(result)[names(col_dict) == "chr"] <- "chr"
         result <- matchMAF(result, maf = maf_1000g)
-        print(head(result) )
+        #print(head(result) )
     }else{
         message("       * using supplied MAF")
         names(result)[names(col_dict) == mafCol] <- "MAF"
-        print(col_dict)
-        print(head(result) )
+        #print(col_dict)
+        #print(head(result) )
     }
     }
     # deal with edge cases - 1 gene and the gene id is NA
@@ -426,8 +425,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
         result <- dplyr::filter(result, !is.na(gene) )
     }
     # if MAF needs matching then chrCol will be "chr" - change it back to "QTL_chr"
-    print( names(col_dict) )
-    print( names(col_dict) == chrCol )
+    #print( names(col_dict) )
+    #print( names(col_dict) == chrCol )
     names(result)[which(names(col_dict) == chrCol) ]   <- "QTL_chr"
     names(result)[which(names(col_dict) == posCol) ]   <- "QTL_pos"
 
@@ -439,10 +438,17 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     }else{
         res_subset <- dplyr::select(result, gene, snp, pvalues, MAF, QTL_chr, QTL_pos)
     }
-    print(head(res_subset) ) 
+    #print(head(res_subset) ) 
     print("passed this point")
     #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
-       
+      
+    if( !is.null(targets) ){
+        res_subset <- dplyr::filter(res_subset, gene == targets)
+        print(paste0(length(unique(res_subset$gene)), " target features remain" ) ) 
+        if( nrow(res_subset) == 0 ){
+            return(NULL)
+        }
+    }
     # split by gene, convert to list object
     res_split <- 
         split(res_subset, res_subset$gene) %>%
@@ -505,7 +511,7 @@ getQTLinfo <- function(q, hit_info){
 ## COLOC results - this should include the GWAS locus, the gene of interest, the top QTL variant and the top QTL p-value
 ## object - this should be a table combining the two input datasets, inner joined on "snp", to be used for plotting.
 ## sig.level now filters out QTLs with P > sig.level
-runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL){
+runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file = NULL){
     message(" * Analysing LOCUS: ", hit$locus )
     # hit is a dataframe containing "snp", "chr", "pos", "locus"
     
@@ -513,8 +519,10 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL){
     hit_range <- joinCoords(hit, flank = 1e6)
  
     # extract GWAS and QTL summary for given coord
-    message("       * extracting GWAS")
-    g <- extractGWAS(gwas, hit_range)
+    if( is.null(qtl2) ){
+        message("       * extracting GWAS")
+        g <- extractGWAS(gwas, hit_range)
+    }
     # get hit info from GWAS
     hit_snp <- hit$snp
   
@@ -534,8 +542,8 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL){
     qtl_range <- joinCoords(qtl_coord, flank = 1e6)
     
     message("       * extracting QTLs")
-    q <- extractQTL(qtl, qtl_range)
-    print(names(q[[1]]))
+    q <- extractQTL(qtl, qtl_range, targets = target.file[1])
+    #print(names(q[[1]]))
     if( is.null(q) ){ return(NULL) }
     qtl_info <- getQTLinfo(q, hit_info)
      # if sig filtering requested
@@ -547,7 +555,7 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL){
 
     if( !is.null(qtl2) ){
         # if second QTL dataset requested
-        q2 <- extractQTL(qtl2, qtl_range)
+        q2 <- extractQTL(qtl2, qtl_range, targets = target.file[2])
         if( is.null(q2) ){ return(NULL) }
         qtl2_info <- getQTLinfo(q2, hit_info)
         if( !is.null(sig.level ) ){
@@ -596,7 +604,9 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL){
             q_1 = q[[ qtl_combos[.x, "Var1"] ]]
             q_2 = q2[[ qtl_combos[.x, "Var2"] ]]
             message( " * ", .x, ": ", unique(q_1$gene), " vs ",  unique(q_2$gene) )
-             if( length(intersect(q_1$snp, q_2$snp) ) == 0 ){
+            #message( head(q_1) )
+            #message( head(q_2) ) 
+            if( length(intersect(q_1$snp, q_2$snp) ) == 0 ){
                 message("Hold up! GWAS and QTL have no SNPs in common")
                 return(NULL)
             }
@@ -656,10 +666,12 @@ calc_LD <- function( coloc_res ){
 
 option_list <- list(
         make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
-        make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database" ),
+        make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database", default = NULL ),
         make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database"),
         make_option(c('--qtl2', '-r'), help = "a second QTL dataset - using this will trigger QTL-QTL COLOC", default = NULL),
         make_option(c('--sig', '-s'), help = "the minimum p-value a QTL should have for testing", default = NULL),
+        make_option(c('--loci', '-l'), help = "text file of loci names", default = NULL),
+        make_option(c('--targets', '-t'), help = "TSV file of features, loci and GWAS for targeted analysis", default = NULL),
         make_option(c('--debug'), help = "load all files and then save RData without running COLOC", action = "store_true", default = FALSE)
 )
 
@@ -673,55 +685,81 @@ qtl_dataset <- opt$qtl
 qtl_dataset_2 <- opt$qtl2
 debug <- opt$debug
 sig <- opt$sig
+loci <- opt$loci
+targets <- opt$targets
+
 
 #maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
 maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
 
 
+# load in MAF table
+if( !exists("maf_1000g")){
+
+  maf_1000g <- loadMAF(maf_1000gp3)
+  # load in liftover chain
+  chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
+}
+
 main <- function(){
-    #gwas_dataset <- "Marioni_2018"
-    #qtl_dataset <- "Microglia_THA"
-    
-    gwas <- pullData(gwas_dataset, "GWAS")
-    qtl <- pullData(qtl_dataset, "QTL")
-    
-    if( !is.null(qtl_dataset_2) ){
-        qtl2 <- pullData(qtl_dataset_2, "QTL")
-    }
-    
-    top_loci <- extractLoci(gwas)
-    
-
-    # load in MAF table
-    if( !exists("maf_1000g")){
-
-        maf_1000g <- loadMAF(maf_1000gp3)
-        # load in liftover chain
-        chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
-    }
-
     if( debug == TRUE){ save.image("debug.RData") }
- 
-    all_coloc <- purrr::map(
+    # regular GWAS-QTL COLOC
+    if( is.null(targets) ){ 
+        gwas <- pullData(gwas_dataset, "GWAS")
+        qtl <- pullData(qtl_dataset, "QTL")
+    
+        if( !is.null(qtl_dataset_2) ){
+            qtl2 <- pullData(qtl_dataset_2, "QTL")
+        }else{ qtl2 <- NULL}
+        top_loci <- extractLoci(gwas)
+        print(paste0(" testing ", nrow(top_loci), " loci ") )
+
+        all_coloc <- purrr::map(
         1:nrow(top_loci), ~{
             res <- runCOLOC(gwas, qtl, qtl2, hit = top_loci[.x,], sig.level = sig)
             if(is.null(res) ){return(NULL) }
             return(res)
+        })
+    }
+    # QTL-QTL COLOC with pairwise targets
+    if(!is.null(targets) ){
+        targets <- read_tsv(targets)
+        print( paste0(" * testing ", nrow(targets), " pairs of QTLs" ) )
+        # for testing
+        #targets <- head(targets, 3)
+        all_coloc <- purrr::map(
+        1:nrow(targets), ~{
+            print( paste0(" * pair ", .x , " of ", nrow(targets) ) )
+            pair_df <- targets[.x,]
+            gwas <- pullData(pair_df$GWAS, "GWAS")
+            locus <- extractLoci(gwas) %>% filter(locus == pair_df$locus)
+            qtl1 <- pullData(pair_df$qtl_1, "QTL")
+            qtl2 <- pullData(pair_df$qtl_2, "QTL")
+            features <- c(pair_df$feature_1, pair_df$feature_2)
+            res <- runCOLOC(gwas, qtl1, qtl2, hit = locus, sig.level = sig, target.file = features)
+            if(is.null(res) ){return(NULL) }
+            return(res)
         }
-    )
-    all_res <- map_df(all_coloc, "full_res")
-    all_obj <- map(all_coloc, "coloc_object")    
-    names(all_obj) <- top_loci$locus
-    all_res <- arrange(all_res, desc(PP.H4.abf)  )
-    
-    outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_COLOC.tsv")
-    if( !is.null(qtl_dataset_2)){
-        outFile <- paste0(outFolder, qtl_dataset, "_", qtl_dataset_2, "_", gwas_dataset, "_COLOC.tsv")
-    }    
+        )
+    }
 
+    all_res <- purrr::map_df(all_coloc, "full_res")
+    all_obj <- purrr::map(all_coloc, "coloc_object")    
+    if(!is.null(targets) ){
+        outFile <- outFolder
+        #outFile <- paste0(outFolder, unique(targets$locus), "_all_pairwise_QTL_COLOC.tsv")
+        all_res <- dplyr::bind_cols(targets, all_res %>% dplyr::select(-locus) )
+    }else{
+        outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_COLOC.tsv")
+        names(all_obj) <- top_loci$locus
+    }
+    all_res <- dplyr::arrange(all_res, desc(PP.H4.abf)  )
+    
     readr::write_tsv(all_res, path = outFile)
     # save COLOC objects for plotting
-    save(all_obj, file = gsub("tsv", "RData", outFile))
+    outData <- gsub("tsv.gz", "RData", outFile)
+    outData <- gsub("tsv", "RData", outFile)
+    save(all_obj, file = outData)
 }
 
 main()
