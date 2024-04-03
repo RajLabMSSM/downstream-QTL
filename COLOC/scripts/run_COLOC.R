@@ -438,6 +438,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets 
     }else{
         res_subset <- dplyr::select(result, gene, snp, pvalues, MAF, QTL_chr, QTL_pos)
     }
+    # edge case - multiallelic SNPs lead to two entries per SNP-gene - remove
+    res_subset <- dplyr::distinct(res_subset)
     #print(head(res_subset) ) 
     print("passed this point")
     #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
