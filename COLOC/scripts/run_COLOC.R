@@ -26,6 +26,7 @@ suppressPackageStartupMessages(library(optparse))
 suppressPackageStartupMessages(library(GenomicRanges))
 suppressPackageStartupMessages(library(rtracklayer))
 
+options(future.globals.maxSize = 8000 * 1024^2)
 
 #library(arrow)
 
@@ -133,7 +134,7 @@ extractLoci <- function(gwas){
 # already filtered from ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/supporting/EUR.2of4intersection_allele_freq.20100804.sites.vcf.gz
 # all sites with an RSID and 2+ alleles 
 loadMAF <- function(path){
-    message(" * loading in MAF from 1000 Genomes")
+    message(Sys.time(), " * loading in MAF from 1000 Genomes")
     maf <- data.table::fread(path, nThread = 4)
     names(maf) <- c("chr", "pos", "snp", "MAF")
     maf$chr <- as.character(maf$chr)
@@ -513,7 +514,8 @@ getQTLinfo <- function(q, hit_info){
 ## COLOC results - this should include the GWAS locus, the gene of interest, the top QTL variant and the top QTL p-value
 ## object - this should be a table combining the two input datasets, inner joined on "snp", to be used for plotting.
 ## sig.level now filters out QTLs with P > sig.level
-runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file = NULL){
+## bare - if TRUE then only return COLOC summary, not full object (saves memory)
+runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file = NULL, bare = FALSE){
     message(" * Analysing LOCUS: ", hit$locus )
     # hit is a dataframe containing "snp", "chr", "pos", "locus"
     
@@ -529,20 +531,24 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file 
     hit_snp <- hit$snp
   
     # problem when no p column in hit!
-
-    hit_info <- hit %>%
-            select(locus, GWAS_SNP = snp, GWAS_P = p)
-    # if GWAS is hg19 then lift over to hg38
-    if(gwas$build != qtl$build){
-        qtl_coord <- liftOverCoord(hit_coord, from = gwas$build, to = qtl$build)
+    if(is.null(gwas) ){
+        hit_info <- hit %>%
+            select(locus) %>% mutate(GWAS_SNP = NA, GWAS_P = NA)
+        qtl_range <- hit_range
     }else{
-        qtl_coord <- hit_coord
+        hit_info <- hit %>%
+            select(locus, GWAS_SNP = snp, GWAS_P = p)
+        # if GWAS is hg19 then lift over to hg38
+        if(gwas$build != qtl$build){
+            qtl_coord <- liftOverCoord(hit_coord, from = gwas$build, to = qtl$build)
+        }else{
+            qtl_coord <- hit_coord
+        }
+        # record the position of the GWAS top SNP
+        hit_info$GWAS_chr <- splitCoords(qtl_coord)$chr
+        hit_info$GWAS_pos <- splitCoords(qtl_coord)$end
+        qtl_range <- joinCoords(qtl_coord, flank = 1e6)
     }
-    # record the position of the GWAS top SNP
-    hit_info$GWAS_chr <- splitCoords(qtl_coord)$chr
-    hit_info$GWAS_pos <- splitCoords(qtl_coord)$end
-    qtl_range <- joinCoords(qtl_coord, flank = 1e6)
-    
     message("       * extracting QTLs")
     q <- extractQTL(qtl, qtl_range, targets = target.file[1])
     #print(names(q[[1]]))
@@ -606,8 +612,6 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file 
             q_1 = q[[ qtl_combos[.x, "Var1"] ]]
             q_2 = q2[[ qtl_combos[.x, "Var2"] ]]
             message( " * ", .x, ": ", unique(q_1$gene), " vs ",  unique(q_2$gene) )
-            #message( head(q_1) )
-            #message( head(q_2) ) 
             if( length(intersect(q_1$snp, q_2$snp) ) == 0 ){
                 message("Hold up! GWAS and QTL have no SNPs in common")
                 return(NULL)
@@ -631,10 +635,11 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file 
     full_res <- full_join(hit_info, full_res, by = "locus")
     # remove rows with no coloc run
     full_res <- filter(full_res, !is.na(PP.H4.abf) )
-    # add pairwise LD between GWAS and QTL SNP
-    #full_res <- calc_LD(full_res)
-
-    return(list(full_res = full_res, coloc_object = coloc_res) ) 
+    if(bare == TRUE){
+        return(list(full_res = full_res) )
+    }else{
+        return(list(full_res = full_res, coloc_object = coloc_res) ) 
+    }
 }
 
 # for each COLOC result per locus
@@ -674,12 +679,14 @@ option_list <- list(
         make_option(c('--sig', '-s'), help = "the minimum p-value a QTL should have for testing", default = NULL),
         make_option(c('--loci', '-l'), help = "text file of loci names", default = NULL),
         make_option(c('--targets', '-t'), help = "TSV file of features, loci and GWAS for targeted analysis", default = NULL),
-        make_option(c('--debug'), help = "load all files and then save RData without running COLOC", action = "store_true", default = FALSE)
+        make_option(c('--debug'), help = "load all files and then save RData without running COLOC", action = "store_true", default = FALSE),
+        make_option(c('--lowmem', '-b'), help = "do not save COLOC objects, just the summaries", action = "store_true", default = FALSE),
+        make_option(c('--threads', '-c'), help = "how many threads to use", default = 1)
 )
 
 option.parser <- OptionParser(option_list=option_list)
 opt <- parse_args(option.parser)
-
+print(opt)
 
 outFolder <- opt$outFolder
 gwas_dataset <- opt$gwas
@@ -688,9 +695,9 @@ qtl_dataset_2 <- opt$qtl2
 debug <- opt$debug
 sig <- opt$sig
 loci <- opt$loci
-targets <- opt$targets
-
-
+target_file <- opt$targets
+low_mem <- opt$lowmem
+threads <- opt$threads
 #maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
 maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
 
@@ -704,9 +711,10 @@ if( !exists("maf_1000g")){
 }
 
 main <- function(){
+    message(Sys.time()," * starting COLOC pipeline")
     if( debug == TRUE){ save.image("debug.RData") }
     # regular GWAS-QTL COLOC
-    if( is.null(targets) ){ 
+    if( is.null(target_file) ){ 
         gwas <- pullData(gwas_dataset, "GWAS")
         qtl <- pullData(qtl_dataset, "QTL")
     
@@ -724,31 +732,40 @@ main <- function(){
         })
     }
     # QTL-QTL COLOC with pairwise targets
-    if(!is.null(targets) ){
-        targets <- read_tsv(targets)
+    if(!is.null(target_file) ){
+        targets <- read_tsv(target_file)
         print( paste0(" * testing ", nrow(targets), " pairs of QTLs" ) )
         # for testing
-        #targets <- head(targets, 3)
-        all_coloc <- purrr::map(
+        targets <- head(targets, 100)
+        if(threads > 1){
+            suppressPackageStartupMessages(library(furrr))
+            plan(multisession, workers = threads)
+            map <- future_map
+        }
+        all_coloc <- map(
         1:nrow(targets), ~{
             print( paste0(" * pair ", .x , " of ", nrow(targets) ) )
             pair_df <- targets[.x,]
-            gwas <- pullData(pair_df$GWAS, "GWAS")
-            locus <- extractLoci(gwas) %>% filter(locus == pair_df$locus)
+            if( "GWAS" %in% names(pair_df) ){
+                gwas <- pullData(pair_df$GWAS, "GWAS") 
+                locus <- extractLoci(gwas) %>% filter(locus == pair_df$locus)
+            }else{
+                locus <- pair_df
+                gwas <- NULL
+            }
             qtl1 <- pullData(pair_df$qtl_1, "QTL")
             qtl2 <- pullData(pair_df$qtl_2, "QTL")
             features <- c(pair_df$feature_1, pair_df$feature_2)
-            res <- runCOLOC(gwas, qtl1, qtl2, hit = locus, sig.level = sig, target.file = features)
+            res <- runCOLOC(gwas, qtl1, qtl2, hit = locus, sig.level = sig, target.file = features, bare = low_mem)
             if(is.null(res) ){return(NULL) }
             return(res)
         }
         )
     }
-
+    
     all_res <- purrr::map_df(all_coloc, "full_res")
-    all_obj <- purrr::map(all_coloc, "coloc_object")    
-    if(!is.null(targets) ){
-        outFile <- outFolder
+    if(!is.null(target_file) ){
+        outFile <- gsub(".tsv.gz", "_COLOC.tsv.gz", target_file)
         #outFile <- paste0(outFolder, unique(targets$locus), "_all_pairwise_QTL_COLOC.tsv")
         all_res <- dplyr::bind_cols(targets, all_res %>% dplyr::select(-locus) )
     }else{
@@ -756,12 +773,19 @@ main <- function(){
         names(all_obj) <- top_loci$locus
     }
     all_res <- dplyr::arrange(all_res, desc(PP.H4.abf)  )
+    message(Sys.time()," * finished COLOC pipeline")
     
     readr::write_tsv(all_res, path = outFile)
     # save COLOC objects for plotting
-    outData <- gsub("tsv.gz", "RData", outFile)
-    outData <- gsub("tsv", "RData", outFile)
-    save(all_obj, file = outData)
+    if( !low_mem ){
+        all_obj <- purrr::map(all_coloc, "coloc_object")
+        if( is.null(targets) ){
+            names(all_obj) <- top_loci$locus
+        }
+        outData <- gsub("tsv.gz", "RData", outFile)
+        outData <- gsub("tsv", "RData", outFile)
+        save(all_obj, file = outData)
+    }
 }
 
 main()
