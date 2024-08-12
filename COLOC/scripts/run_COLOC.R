@@ -144,9 +144,10 @@ extractLoci <- function(gwas){
 # already filtered from ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/supporting/EUR.2of4intersection_allele_freq.20100804.sites.vcf.gz
 # all sites with an RSID and 2+ alleles 
 loadMAF <- function(path){
-    message(" * loading in MAF from 1000 Genomes")
+    message(" * loading in MAF from gnomAD v4")
     maf <- data.table::fread(path, nThread = 4)
     names(maf) <- c("chr", "pos", "snp", "MAF")
+    maf$chr <- gsub('chr', '', maf$chr)
     maf$chr <- as.character(maf$chr)
     data.table::setkey(maf, "chr")
     maf$MAF <- suppressWarnings(as.numeric(maf$MAF))
@@ -568,8 +569,8 @@ runCOLOC <- function(gwas, qtl, hit){
     coloc_res <- 
         purrr::map( q, ~{
             # if QTL has no overlapping SNPs with GWAS summary then return NULL
-            if( length(intersect(g$snp, .x$snp) ) == 0 ){ 
-                message("Hold up! GWAS and QTL have no SNPs in common")
+	    if( length(intersect(g$snp, .x$snp) ) < 10 ){ 	
+                message("Hold up! GWAS and QTL have less 10 SNPs in common")
                 return(NULL) 
             }
             coloc_object <- coloc.abf(dataset1 = g, dataset2 = .x)
@@ -580,7 +581,7 @@ runCOLOC <- function(gwas, qtl, hit){
             coloc_df <- as.data.frame(t(coloc_object$summary), stringsAsFactors = FALSE)
             return( list(df = coloc_df, object = coloc_object) )
         })
-    if( is.null(coloc_res) ){ return(NULL) }
+    if( all(sapply(coloc_res, is.null))){ return(NULL) }
 
     message("       * COLOC finished")
     coloc_df <- map_df(coloc_res, "df", .id = "gene") %>% 
@@ -655,11 +656,12 @@ debug <- opt$debug
 # for each locus run COLOC
 maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
 maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
+gnomad_v4 <- '/sc/arion/projects/ad-omics/data/references/gnomAD_v4/genomes/EUR_MAF/EUR.all.gnomAD_v4_MAF0001.bed.gz'
 
 # load in MAF table
 if( !exists("maf_1000g")){
 
-        maf_1000g <- loadMAF(maf_1000gp3)
+        maf_1000g <- loadMAF(gnomad_v4)
         # load in liftover chain
         chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
     }
