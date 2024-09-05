@@ -81,7 +81,7 @@ get_standard_error <- function(OR, P){
 # write out sorted file to reference folder
 # tabix index the file
 # Ripke has loci with chr23 for X - remove
-sortGWAS <- function(gwas, out_folder = "./"){
+sortGWAS <- function(gwas, out_folder = ""){
     dataset <- gwas$dataset
     
     col_chr <- gwas$full_chrom
@@ -127,7 +127,7 @@ sortGWAS <- function(gwas, out_folder = "./"){
     # remove duplicate rows
     gwas_sorted <- dplyr::distinct(gwas_sorted)
     
-    out_path <- paste0(out_folder, dataset, ".processed.tsv")
+    out_path <- file.path(out_folder, paste0(dataset, ".processed.tsv") )
     message(Sys.time()," * writing sorted GWAS file to ", out_path)
     readr::write_tsv(gwas_sorted, out_path)
     stopifnot(file.exists(out_path) )

@@ -1,5 +1,4 @@
 __default__:
-  #partition: chimera
   queue: premium
   cores: 1
   mem: 24000
@@ -8,3 +7,7 @@ __default__:
   output: logs/{rule}:{wildcards}.stdout
   error: logs/{rule}:{wildcards}.stderr
   himem: ""
+pairwise_QTL_COLOC:
+  cores: 4
+  mem: 8000
+  time: 8640
