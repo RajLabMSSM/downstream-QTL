@@ -1,0 +1,12 @@
+datasets:
+  - AnswerALS_expression
+  - ROSMAP_DLPFC_expression_EUR
+  - ROSMAP_Head_of_Caudate_Nucleus_expression_EUR
+  - ROSMAP_PCC_expression_EUR
+
+chrom: [21] # list in brackets which chromosomes you want to include. for chrs, type "all"
+
+outFolder: "outfolder/"
+dataCode: "bigbrain_first_pass_5-20-22"
+
+vcf: "/sc/arion/projects/bigbrain/downstream-QTL/METASOFT/dbSNP_hg38_common_chr21.vcf.gz"

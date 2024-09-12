@@ -9,21 +9,33 @@
 # dataCode: "test"
 import os
 datasets = config["datasets"]
+chromosomes = config["chrom"]
 
-prefix = "-".join(datasets)
+#prefix = "-".join(datasets)
+prefix = "merged_cohorts"
 
 outFolder = config["outFolder"]
 
 dataset_string = os.path.join(outFolder, prefix)
 print(dataset_string)
 
-chromosomes = list(range(1,23))
+#chromosomes = config["chrom"]
+print(chromosomes)
+
+if chromosomes == "all": 
+    chromosomes = list(range(1,23))
+
+print("chromosomes = ", chromosomes)
+#chromosomes = list(range(1,23))
 vcf = config["vcf"]
 
 rule all:
     input:
-        expand(dataset_string + ".{tool}.{filetype}.qval.tsv.gz",  tool = ["metasoft", "re2c"], filetype = ["top_assoc"] ),
-        expand(dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz.tbi", tool = ["metasoft", "re2c"], filetype = "full_assoc" )
+        expand(dataset_string + ".metasoft.{filetype}.qval.tsv.gz",  filetype = ["top_assoc"] ),
+	expand(dataset_string + ".metasoft.{filetype}.tabixed.tsv.gz.tbi", filetype = "full_assoc" )
+	#expand(dataset_string + ".{tool}.{filetype}.qval.tsv.gz",  tool = ["metasoft", "re2c"], filetype = ["top_assoc"] ),
+        #expand(dataset_string + ".{tool}.{filetype}.tabixed.tsv.gz.tbi", tool = ["metasoft", "re2c"], filetype = "full_assoc" )
+
 
 rule createInputFiles:
     output:
