@@ -19,7 +19,7 @@ tabix (ml bcftools/1.9)
 ### R packages
 
 
-* MR
+* TwoSampleMR (https://mrcieu.github.io/TwoSampleMR/)
 
 ### Functions:
 
