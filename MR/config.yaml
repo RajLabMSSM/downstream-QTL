@@ -1,0 +1,27 @@
+gwas:
+# - LBD_AMPPD_2023 # LBD
+ - TrubetskoyEUR_2022 # SCZ
+# - NicolasSuggestive_2018 # ALS
+ - VanRheenenEUR_2021 #ALS
+# - Farrell_PSP # PSP'
+# - Mullins_2021 # BP' Error
+# - Stahl_2019 # BP -LD
+ - Daner_2020 # BP - LD
+# - Pottier_2019 # FLD'
+ - Bellenguez_2021 # AD
+ - Kunkle_2019 # AD
+ - Jansen_2018 # AD
+ - Marioni_2018 # AD
+ - Nalls23andMe_2019 # PD
+ - IMSGC_2019 # MS'
+# - Wray_2018 # MDD
+# - Yengo_2022
+
+qtl:
+ - mmQTL_MiGA_expression
+
+outFolder: "./" 
+
+FDR_option: TRUE
+
+geneMeta: "/sc/arion/projects/ad-omics/data/references//hg38_reference/GENCODE/gencode.v38.primary_assembly/gencode.v38.primary_assembly.tx2gene.tsv.gz"

@@ -1,0 +1,54 @@
+import sys
+import pandas as pd
+# COLOC pipeline
+gwas_data = config["gwas"]
+qtl_data = config["qtl"]
+outFolder = config["outFolder"]
+geneMeta = config["geneMeta"]
+fdr = config["FDR_option"]
+
+# sanity check - can the GWAS and QTL data be found in the database?
+gwas_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = "GWAS")
+qtl_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = "QTL")
+
+gwas_check = all(i in gwas_df["dataset"].tolist() for i in gwas_data )
+qtl_check = all(i in qtl_df["dataset"].tolist() for i in qtl_data )
+
+if not all([gwas_check, qtl_check]):
+    print(" * QTL and/or GWAS cannot be found in database")
+    sys.exit()
+
+shell.prefix("export PS1=""; ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate snakemake;")
+rule all:
+    input:
+        #expand(outFolder + "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz", GWAS = gwas_data, QTL = qtl_data)
+        outFolder + "all_MR_results_merged_H4_0_snp.tsv.gz",
+        outFolder + "all_MR_results_merged_H4_1_snp.tsv.gz",
+        #expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
+        #outFolder + "all_COLOC_summary_results.tsv.gz"
+
+rule run_MR:
+    output:
+        outFolder + "{GWAS}/{QTL}_{GWAS}_MR.tsv",
+        #outFolder +  "{GWAS}/{QTL}_{GWAS}_SMR.RData"
+    params:
+        script = "scripts/run_MR.R"
+    shell:
+        "mkdir -p {outFolder}{wildcards.GWAS};"
+        "ml R/4.2.0;" #ml arrow;"
+        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -f {wildcards.fdr} -o {outFolder}{wildcards.GWAS}/ "
+   
+rule merge_MR_snp_level:
+    input:
+        expand( outFolder + "{GWAS}/{QTL}_{GWAS}_MR.tsv", GWAS = gwas_data, QTL = qtl_data )
+    output:
+        outFolder + "all_MR_results_merged_H4_0_snp.tsv.gz",
+        outFolder + "all_MR_results_merged_H4_1_snp.tsv.gz"
+    params:
+        script = "scripts/merge_MR_results.R"
+    shell:
+        "ml R/4.2.0;"
+        "Rscript {params.script} -f {wildcards.fdr} --threshold 0 --inFolder {outFolder} --geneMeta {geneMeta};" 
+        "Rscript {params.script} -f {wildcards.fdr} --threshold 1 --inFolder {outFolder} --geneMeta {geneMeta}"
+
+
