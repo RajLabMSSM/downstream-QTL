@@ -34,7 +34,7 @@ rule run_COLOC:
         script = "scripts/run_COLOC.R"
     shell:
         "mkdir -p {outFolder}{wildcards.GWAS};"
-        "ml R/4.0.3;" #ml arrow;"
+        "ml R/4.2.0;" #ml arrow;"
         "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -o {outFolder}{wildcards.GWAS}/ "
    
 rule merge_COLOC_snp_level:
@@ -46,18 +46,18 @@ rule merge_COLOC_snp_level:
     params:
         script = "scripts/merge_COLOC_results.R"
     shell:
-        "ml R/4.0.3;"
+        "ml R/4.2.0;"
         "Rscript {params.script} --threshold 0 --inFolder {outFolder} --geneMeta {geneMeta};" 
         "Rscript {params.script} --threshold 0.5 --ld --inFolder {outFolder} --geneMeta {geneMeta} "
 
-rule create_LD_tables:
-    input:
-        outFolder +  "{GWAS}/{QTL}_{GWAS}_COLOC.RData"
-    output:
-        outFolder +  "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz"
-    params:
-        script = "scripts/prepare_gwas_qtls.R",
-        out = outFolder +  "{GWAS}/{QTL}/"
-    shell:
-       "conda activate echoR;"
-       "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} --inFile {input} --outFolder {params.out}" 
+#rule create_LD_tables:
+#    input:
+#        outFolder +  "{GWAS}/{QTL}_{GWAS}_COLOC.RData"
+#    output:
+#        outFolder +  "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz"
+#    params:
+#        script = "scripts/prepare_gwas_qtls.R",
+#        out = outFolder +  "{GWAS}/{QTL}/"
+#    shell:
+#       "conda activate echoR;"
+#       "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} --inFile {input} --outFolder {params.out}" 

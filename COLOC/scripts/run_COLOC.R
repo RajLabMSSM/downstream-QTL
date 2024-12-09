@@ -177,6 +177,24 @@ matchMAF <- function(data, maf){
     return(matched)
 }
 
+checkData <- function(data){
+  message("   * before data check: ", nrow(data), " SNPs")
+  
+  data$MAF <- as.numeric(data$MAF)
+  data <- data %>% dplyr::filter((MAF<1)&(MAF>0))
+  data <- data[!is.na(data$pvalues),]
+  
+  if(("beta" %in% colnames(data))&("varbeta" %in% colnames(data))){
+    data <- data[!is.na(data$beta),]
+    data <- data[!is.na(data$varbeta),]
+  }
+
+
+  message("   * after data check: ", nrow(data), " SNPs")
+  
+  return(data)
+}
+
 # 
 # extract SNPs within coordinate range from a GWAS summary stat file
 # account for different GWAS having different column naming and ordering with a GWAS_config.yaml file
@@ -211,7 +229,7 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/da
         }
     }
      
-    cmd <- paste( "ml bcftools; tabix -h ", gwas_path, coord ) 
+    cmd <- paste( "ml tabix; tabix -h ", gwas_path, coord ) 
     message(" * running command: ", cmd)
  
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
@@ -245,12 +263,21 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/da
             names(result)[names(col_dict) == mafCol] <- "MAF" 
         }
     }
+
     # convert standard error to the variance
     # se is standard error - not standard deviation!
     result$varbeta <- result$varbeta^2
+    
+
     print(head(result))
     #save.image("debug.RData") 
     result <- dplyr::select( result, snp, pvalues, beta, varbeta, MAF, chr, pos, A1, A2)
+    result <- checkData(result)
+    result <- result %>% 
+      dplyr::arrange(snp, pvalues) %>% 
+      dplyr::distinct(snp, .keep_all = T)
+    
+    message("   * after removing duplicated: ", nrow(result), " SNPs")
     
     result <- as.list(result)
     
@@ -345,7 +372,7 @@ extractQTL_tabix <- function(qtl, coord){
         }
     }
     stopifnot( file.exists(qtl$full_path) )
-    cmd <- paste( "ml bcftools; tabix -h ", qtl$full_path, coord )
+    cmd <- paste( "ml tabix; tabix -h ", qtl$full_path, coord )
     message("       * running command: ", cmd)
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
     # deal with regions of no QTL association
@@ -430,6 +457,8 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
         print(col_dict)
         print(head(result) )
     }
+      result$MAF <- as.numeric(result$MAF)
+      result <- result %>% dplyr::filter((MAF<1)&(MAF>0))
     }
     # deal with edge cases - 1 gene and the gene id is NA
     if( all( is.na(result$gene) ) ){
@@ -445,14 +474,22 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     names(result)[which(names(col_dict) == posCol) ]   <- "QTL_pos"
 
     #print(head(result) ) 
-    
+
     # retain only associations within locus coords
     if( !is.na(betaCol) & !is.na(seCol) ){
         res_subset <- dplyr::select(result, gene, snp, pvalues, beta, varbeta, MAF, QTL_chr, QTL_pos)
     }else{
         res_subset <- dplyr::select(result, gene, snp, pvalues, MAF, QTL_chr, QTL_pos)
     }
-    print(head(res_subset) ) 
+    res_subset <- checkData(res_subset)
+    res_subset <- res_subset %>% 
+      dplyr::arrange(snp, pvalues) %>% 
+      group_by(gene) %>%
+      dplyr::distinct(snp, .keep_all = T)
+    
+    message("   * after removing duplicated: ", nrow(res_subset), " SNPs")
+    
+    print(head(res_subset)) 
     print("passed this point")
     #dplyr::filter( pos >= coord_split$start & pos <= coord_split$end)
        
@@ -569,8 +606,8 @@ runCOLOC <- function(gwas, qtl, hit){
     coloc_res <- 
         purrr::map( q, ~{
             # if QTL has no overlapping SNPs with GWAS summary then return NULL
-	    if( length(intersect(g$snp, .x$snp) ) < 10 ){ 	
-                message("Hold up! GWAS and QTL have less 10 SNPs in common")
+            if( length(intersect(g$snp, .x$snp) ) < 10 ){ 
+                message("Hold up! GWAS and QTL have no SNPs in common")
                 return(NULL) 
             }
             coloc_object <- coloc.abf(dataset1 = g, dataset2 = .x)
@@ -582,7 +619,7 @@ runCOLOC <- function(gwas, qtl, hit){
             return( list(df = coloc_df, object = coloc_object) )
         })
     if( all(sapply(coloc_res, is.null))){ return(NULL) }
-
+    
     message("       * COLOC finished")
     coloc_df <- map_df(coloc_res, "df", .id = "gene") %>% 
         dplyr::mutate(locus = hit$locus ) %>%
@@ -624,6 +661,38 @@ calc_LD <- function( coloc_res ){
     # wait 5 seconds before returning - makes sure API queries are spread out
     #Sys.sleep(time = 5)
     return(coloc_res) 
+}
+
+# flank coordinates by set number of bases (default 1MB)
+credible_set <- function(pip, conf=c(0.95, 0.99)){
+  total = sum(pip)
+  conf = sort(conf)
+  sumbounds = total * conf
+  name.ori = names(pip)
+  names(pip) = 1:length(pip)
+  pip = sort(pip, decreasing=TRUE)
+  order.ori = names(pip)
+  # find bound
+  cred_bounds <- c()
+  for(sumbound in sumbounds){
+    total = 0
+    cred_pip <- c()
+    for(i in 1:length(pip)){
+      total = sum(total, pip[i])
+      cred_pip = c(cred_pip, pip[i])
+      if(total > sumbound) break
+    }
+    cred_bounds = c(cred_bounds, min(cred_pip))
+  }
+  # make results
+  rslt <- rep(0, length(pip))
+  names(rslt) = names(pip)
+  for(k in 1:length(conf)){
+    rslt[pip >= cred_bounds[length(conf) - k + 1]] = conf[length(conf) - k + 1]
+  }
+  rslt = rslt[order(as.numeric(order.ori))]
+  names(rslt) = name.ori
+  return(rslt)
 }
 
 
@@ -676,7 +745,8 @@ main <- function(){
     gwas <- pullData(gwas_dataset, "GWAS")
     qtl <- pullData(qtl_dataset, "QTL")
     
-    top_loci <- extractLoci(gwas)
+    top_loci <- extractLoci(gwas) 
+    #top_loci <- top_loci [ which(top_loci$locus %in% c('IGH_cluster','FERMT2')),]
     
     # for testing
     #top_loci <- top_loci[2,]
@@ -702,6 +772,56 @@ main <- function(){
     readr::write_tsv(all_res, path = outFile)
     # save COLOC objects for plotting
     save(all_obj, file = gsub("tsv", "RData", outFile))
+
+    
+    all_credible <- data.frame()
+    locus_list <- names(all_obj)
+    #locus_list
+    for(loci in locus_list){
+
+      message(loci)
+      qtl_list <- names(all_obj[[loci]])
+
+      for(qtl in qtl_list){
+
+
+        results <- all_obj[[loci]][[qtl]][['object']][['results']]
+        if(is.null(results)){next}
+
+        summary <- all_obj[[loci]][[qtl]][['object']][['summary']] %>% t() %>% as.data.frame()
+        priors <- all_obj[[loci]][[qtl]][['object']][['priors']] %>% t() %>% as.data.frame()
+
+        if((summary$PP.H4.abf > 0.5)&(nrow(results)>0)){
+
+          message(paste0(loci,'-',qtl))
+          results$CS <- credible_set(results$SNP.PP.H4, conf=c(0.95, 0.99))
+          res_credible <- results[results$CS!=0, ] %>% as.data.frame()
+
+          res_credible$GWAS <- gwas_dataset
+          res_credible$locus <- loci
+          res_credible$QTL <- qtl_dataset
+          res_credible$feature <- qtl
+
+          all_credible <- rbind(all_credible, res_credible)
+
+        }
+
+      }
+
+    }
+    if(nrow(all_credible)==0){
+      all_credible <- data.frame(matrix(ncol=ncol(results)+5))
+      colnames(all_credible) <- c(colnames(results),'CS','GWAS','locus','QTL','feature')
+    }else{
+      all_credible <- arrange(all_credible, locus )
+    }
+    outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_COLOC_credible.tsv")
+    message(outFile)
+    readr::write_tsv(all_credible, path = outFile)
+
+
+
+
 }
 
 main()
