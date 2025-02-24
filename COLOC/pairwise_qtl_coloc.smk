@@ -8,8 +8,9 @@ import os
 # Jack Humphrey
 outFolder = config["outFolder"]
 inFolder = config["inFolder"]
+MAF_file = config["MAF_file"]
 
-target_files = [ x for x in glob.glob(inFolder + "*genewide_QTL_pairs*tsv.gz" )]
+target_files = [ x for x in glob.glob(inFolder + "*genewide*pairs*tsv.gz" )]
 target_ids = [os.path.basename(re.sub('.tsv.gz', '', x, count=1)) for x in target_files ]
 
 
@@ -27,4 +28,4 @@ rule pairwise_QTL_COLOC:
         script = "scripts/run_COLOC.R"
     shell:
         "ml R;" 
-        "Rscript {params.script} --targets {input} -o {outFolder} --lowmem --threads 1"
+        "Rscript {params.script} --targets {input} -o {outFolder} --lowmem --threads 1 --MAF {MAF_file}"

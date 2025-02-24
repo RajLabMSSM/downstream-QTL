@@ -153,9 +153,9 @@ extractLoci <- function(gwas){
 # already filtered from ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/supporting/EUR.2of4intersection_allele_freq.20100804.sites.vcf.gz
 # all sites with an RSID and 2+ alleles 
 loadMAF <- function(path){
-    message_("loading in MAF from 1000 Genomes")
+    #message_("loading in MAF from 1000 Genomes")
     maf <- data.table::fread(path, nThread = 4)
-    names(maf) <- c("chr", "pos", "snp", "MAF")
+    names(maf)[1:4] <- c("chr", "pos", "snp", "MAF")
     maf$chr <- as.character(maf$chr)
     data.table::setkey(maf, "chr")
     maf$MAF <- suppressWarnings(as.numeric(maf$MAF))
@@ -179,8 +179,9 @@ matchMAF <- function(data, maf){
     matched <- data[ !is.na(data$MAF) & data$MAF >0 & data$MAF < 1,]
     message_verbose(paste0("after joining MAF: ", nrow(matched), " SNPs"))
     if(nrow(matched) == 0 ){
-        message_verbose(head(data) )
-    stop("no SNPs match on RSID. Inspect data")
+        #message_verbose(head(data) )
+        message_verbose("no SNPs match on RSID. Inspect data")
+        return(NULL)
     }
     return(matched)
 }
@@ -219,7 +220,7 @@ extractGWAS <- function(gwas, coord, refFolder = "/sc/arion/projects/ad-omics/da
         }
     }
      
-    cmd <- paste( "ml bcftools; tabix -h ", gwas_path, coord ) 
+    cmd <- paste( "ml bcftools/1.9; tabix -h ", gwas_path, coord ) 
     message_verbose(paste0("running command: ", cmd) )
  
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
@@ -351,7 +352,7 @@ extractQTL_tabix <- function(qtl, coord){
         }
     }
     stopifnot( file.exists(qtl$full_path) )
-    cmd <- paste( "ml bcftools; tabix -h ", qtl$full_path, coord )
+    cmd <- paste( "ml bcftools/1.9; tabix -h ", qtl$full_path, coord )
     message_verbose(paste0("running command: ", cmd))
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
     # deal with regions of no QTL association
@@ -411,9 +412,11 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets 
         names(result)[names(col_dict) == seCol]    <- "varbeta"
         # don't forget to square the standard error to get the variance             
         result$varbeta <- result$varbeta^2
- 
+        message_verbose(" remove associations with 0 variance")
+        message_verbose(paste0(" before: ", nrow(result), " associations"))
         # remove rows with variance of 0 - this will corrupt COLOC
         result <- dplyr::filter(result, varbeta != 0) 
+        message_verbose(paste0(" after: ", nrow(result), " associations"))
     }
     names(result)[names(col_dict) == snpCol]   <- "snp"
     # Young microglia use log10P - convert
@@ -423,12 +426,13 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets 
 
     # deal with MAF - meta-analysis outputs won't have it
     # this requires "chr" to be present in QTL data
-    if( debug == TRUE){ result$MAF <- NA }else{
+    #if( debug == TRUE){ result$MAF <- NA }else{ # why do we do this? breaks it when debug is TRUE
     if( is.na(mafCol) | force_maf == TRUE ){
         message_verbose("MAF not present - using 1000 Genomes MAF")
         #stopifnot( "chr" %in% names(col_dict) )
         names(result)[names(col_dict) == "chr"] <- "chr"
         result <- matchMAF(result, maf = maf_1000g)
+        if( all(is.na(result$MAF) ) | is.null(result) ){ return(NULL) }
         #print(head(result) )
     }else{
         message_verbose("using supplied MAF")
@@ -436,7 +440,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets 
         #print(col_dict)
         #print(head(result) )
     }
-    }
+    #}
     # deal with edge cases - 1 gene and the gene id is NA
     if( all( is.na(result$gene) ) ){
         message_verbose("no genes in QTL result")
@@ -458,8 +462,14 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets 
     }else{
         res_subset <- dplyr::select(result, gene, snp, pvalues, MAF, QTL_chr, QTL_pos)
     }
+    # jan 2025: another edge case - NA pvalues
+    message_verbose("removing NA P-values")
+    res_subset <- filter(res_subset, !is.na(pvalues) )
+    message_verbose(paste0("after: ", nrow(res_subset) ))
     # edge case - multiallelic SNPs lead to two entries per SNP-gene - remove
+    message_verbose("removing multi-allelic SNPs")
     res_subset <- dplyr::distinct(res_subset)
+    message_verbose(paste0("after: ", nrow(res_subset) ))
     #print(head(res_subset) ) 
     message_verbose("passed this point")
     #save(list = ls(all.names = TRUE), file = "image.RData", envir = 
@@ -469,6 +479,7 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets 
     if( !is.null(targets) ){
         res_subset <- dplyr::filter(res_subset, gene == targets)
         message_verbose(paste0(length(unique(res_subset$gene)), " target features remain" ) ) 
+        message_verbose(paste0(nrow(res_subset), " associations remain"))
         if( nrow(res_subset) == 0 ){
             return(NULL)
         }
@@ -586,7 +597,12 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file 
         # if second QTL dataset requested
         q2 <- extractQTL(qtl2, qtl_range, targets = target.file[2])
         if( is.null(q2) ){ return(NULL) }
-        qtl2_info <- getQTLinfo(q2, hit_info)
+        # get QTL betas for lead SNP in QTL 1
+        hit_info_qtl1 <- data.frame(locus = hit_info$locus, GWAS_SNP = qtl_info$QTL_SNP, GWAS_P = qtl_info$QTL_P)
+        qtl2_info <- getQTLinfo(q2, hit_info_qtl1)
+        # get QTL betas for lead SNP in QTL 2
+        hit_info_qtl2 <- data.frame(locus = hit_info$locus, GWAS_SNP = qtl2_info$QTL_SNP, GWAS_P = qtl2_info$QTL_P)
+        qtl_info <- getQTLinfo(q, hit_info_qtl2)
         if( !is.null(sig.level ) ){
             qtl2_info <- filter(qtl2_info, QTL_P < sig.level)
             q2 <- q2[ qtl2_info$gene ]
@@ -644,7 +660,7 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file 
             return( list(df = coloc_df, object = coloc_object) )
         })
     }
-    if( is.null(coloc_res) ){ return(NULL) }
+    if( is.null(unlist(coloc_res)) ){ return(NULL) }
 
     message_("COLOC finished")
     coloc_df <- map_df(coloc_res, "df", .id = "gene") %>% 
@@ -693,7 +709,7 @@ calc_LD <- function( coloc_res ){
 
 
 option_list <- list(
-        make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
+        make_option(c('-o', '--outFolder'), help='the path to the output file', default = "."),
         make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database", default = NULL ),
         make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database"),
         make_option(c('--qtl2', '-r'), help = "a second QTL dataset - using this will trigger QTL-QTL COLOC", default = NULL),
@@ -703,6 +719,7 @@ option_list <- list(
         make_option(c('--debug'), help = "load all files and then save RData without running COLOC", action = "store_true", default = FALSE),
         make_option(c('--lowmem', '-b'), help = "do not save COLOC objects, just the summaries", action = "store_true", default = FALSE),
         make_option(c('--threads', '-c'), help = "how many threads to use", default = 1),
+        make_option(c('--MAF', '-m'), help = "path to custom MAF file", default = NULL),
         make_option(c('--verbose', '-v'), help = "if selected then output more information", action = "store_true", default = FALSE)
 )
 
@@ -720,15 +737,22 @@ target_file <- opt$targets
 low_mem <- opt$lowmem
 threads <- opt$threads
 verbose <- opt$verbose
-#maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
-maf_1000gp3 <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
+MAF <- opt$MAF
+
+# default MAF is 1000g phase 3v5
+# but users can provide their own
+# must have columns chr, pos, snp, MAF
+if( is.null(MAF) ){
+    #maf_1000gp1 <- "/sc/arion/projects/ad-omics/data/references/1KGP1/1000G_EUR_MAF.bed.gz"
+    MAF <- "/sc/arion/projects/ad-omics/data/references/1KGPp3v5/EUR_MAF/EUR.all.phase3_MAF.bed.gz"
+}
 
 if(verbose){print(opt)}
 
 # load in MAF table
-if( !exists("maf_1000g")){
-
-  maf_1000g <- loadMAF(maf_1000gp3)
+if( !exists("maf_1000g") ){
+  message(paste0("loading MAF from ", MAF ) )
+  maf_1000g <- loadMAF(MAF)
   # load in liftover chain
   chain_hg19_hg38 <- import.chain("/sc/arion/projects/ad-omics/data/references/liftOver/hg19ToHg38.over.chain")    
 }
@@ -794,16 +818,19 @@ main <- function(){
     
     all_res <- purrr::map_df(all_coloc, "full_res")
     if(!is.null(target_file) ){
-        outFile <- file.path(outFolder, gsub(".tsv.gz", "_COLOC.tsv.gz", basename(target_file) ) )
-        all_res <- dplyr::bind_cols(targets, all_res %>% select(-locus) )
+        outFile <- file.path(outFolder, gsub(".tsv", "_COLOC.tsv", basename(target_file) ) )
+        # here if any of the COLOCs did not proceed then the target df will be larger than the all_res results        
+
+        #all_res <- dplyr::bind_cols(targets, all_res %>% select(-locus) )
     }else{
-        outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_COLOC.tsv")
+        outFile <- paste0(outFolder,"/", qtl_dataset, "_", gwas_dataset, "_COLOC.tsv")
         names(all_obj) <- top_loci$locus
     }
+    dir.create(outFolder,  showWarnings = FALSE)
     all_res <- dplyr::arrange(all_res, desc(PP.H4.abf)  )
     message("finished COLOC pipeline")
     message_verbose(paste0("writing output to ", outFile))
-    readr::write_tsv(all_res, path = outFile)
+    readr::write_tsv(all_res, file = outFile)
     # save COLOC objects for plotting
     if( !low_mem ){
         all_obj <- purrr::map(all_coloc, "coloc_object")
