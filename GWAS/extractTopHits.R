@@ -70,7 +70,7 @@ extractGWAS <- function(gwas, chr, refFolder = "/sc/arion/projects/ad-omics/data
         }
     }
 
-    cmd <- paste( "ml bcftools; tabix -h ", gwas_path, coord )
+    cmd <- paste( "ml tabix; tabix -h ", gwas_path, coord )
     message(" * running command: ", cmd)
 
     result <- as.data.frame(data.table::fread(cmd = cmd, nThread = 4) )
