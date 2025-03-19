@@ -150,14 +150,14 @@ tabixGWAS <- function(gwas, outFolder = "./"){
     
     # bgzip
     message(Sys.time()," * bgzipping GWAS" )
-    system( paste("ml bcftools; bgzip -f ", out_path) )
+    system( paste("ml tabix; bgzip -f ", out_path) )
 
     out_path_gzip <- paste0(out_path, ".gz")
     stopifnot(file.exists(out_path_gzip) )
 
     # tabix file
     message(Sys.time()," * tabixing GWAS" )
-    tabix_cmd <- paste0("ml bcftools; tabix -f -S 1 -s ", n_chr, " -b ", n_pos, " -e ", n_pos, " ", out_path_gzip)
+    tabix_cmd <- paste0("ml tabix; tabix -f -S 1 -s ", n_chr, " -b ", n_pos, " -e ", n_pos, " ", out_path_gzip)
     message(tabix_cmd)
     system(tabix_cmd)
     out_path_tabix <- paste0(out_path_gzip, ".tbi")
