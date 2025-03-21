@@ -61,7 +61,7 @@ main <- function(){
     #qtl_dataset <- "Microglia_THA"
     
     
-    all_files <- list.files(paste0(outFolder), pattern = "_cre.tsv",
+    all_files <- list.files(paste0(outFolder), pattern = "_credible.tsv",
                             recursive = TRUE,
                             full.names = TRUE )
   
