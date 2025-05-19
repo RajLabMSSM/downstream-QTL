@@ -19,10 +19,10 @@
 # extract top QTL SNP for locus
 # record results in table - GWAS locus, Gene, top QTL SNP, MR p value
 
-.libPaths( c( '/hpc/users/jangb03/R/x86_64-pc-linux-gnu-library/4.2/' , .libPaths() ) )
+
 suppressPackageStartupMessages(library(tidyverse))
 # suppressPackageStartupMessages(library(coloc))
-suppressPackageStartupMessages(library(TwoSampleMR, lib.loc = '/hpc/users/jangb03/R/x86_64-pc-linux-gnu-library/4.2/'))
+suppressPackageStartupMessages(library(TwoSampleMR))
 suppressPackageStartupMessages(library(rtracklayer))
 suppressPackageStartupMessages(library(optparse))
 
