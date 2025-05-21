@@ -106,7 +106,7 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
     stopifnot( file.exists(qtl$full_path) )
      
     # read in QTL
-    cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr)
+    cmd <- paste0("ml tabix; tabix ", qtl$full_path, " ", chr)
     message( " * ", cmd) 
     loci_df <- data.table::fread( cmd = cmd, nThread = 8 )
     if( nrow(loci_df) == 0){ 
