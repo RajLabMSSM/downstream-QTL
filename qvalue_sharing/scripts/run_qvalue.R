@@ -278,7 +278,9 @@ qvalue_res <- left_join(source_top_res, target_res, by = c("pheno", "snp") )
 
 # remove missing values
 qvalue_res <- qvalue_res[ !is.na(qvalue_res$target_pvalue), ]
-
+qvalue_res <- qvalue_res[qvalue_res$target_pvalue !=1, ]
+qvalue_res <- qvalue_res[qvalue_res$target_beta !=0, ]
+    
 # write data
 save(qvalue_res, source_top_res, target_res,  file = gsub("tsv", "RData", outFile) )
 
