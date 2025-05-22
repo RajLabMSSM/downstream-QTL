@@ -29,7 +29,7 @@ rule run_qvalue:
     output:
         outFolder + "{source}:{target}:{threshold}.qvalue.tsv"
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.0.3;"
         "Rscript {params.script} -s {params.source} -t {params.target} -q {threshold} -o {outFolder}"
 
 rule merge_qvalue:
@@ -40,5 +40,5 @@ rule merge_qvalue:
     output:
         outFolder + "all_qvalue_merged." + threshold + ".tsv"
     shell:
-        "ml R/3.6.0;"
+        "ml R/4.0.4;"
         "Rscript {params.script} -o {outFolder} -q {threshold}"
