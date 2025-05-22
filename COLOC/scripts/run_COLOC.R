@@ -651,7 +651,7 @@ calc_LD <- function( coloc_res ){
     snps <- snps[!is.na(snps)]
     
     # get pairwise LD matrix
-    ld_matrix <-  LDmatrix( snps, pop = "CEU", r2d = "r2", token = Sys.getenv("LDLINK_TOKEN") )
+    ld_matrix <-  LDmatrix( snps, pop = "EUR", r2d = "r2", token = Sys.getenv("LDLINK_TOKEN") )
     
     #stopifnot( nrow(ld_matrix) < length(snps) )
 
