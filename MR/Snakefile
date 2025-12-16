@@ -1,6 +1,6 @@
+# MR pipeline
 import sys
 import pandas as pd
-# COLOC pipeline
 gwas_data = config["gwas"]
 qtl_data = config["qtl"]
 outFolder = config["outFolder"]
@@ -19,6 +19,7 @@ if not all([gwas_check, qtl_check]):
     sys.exit()
 
 shell.prefix("export PS1=""; ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate snakemake;")
+
 rule all:
     input:
         #expand(outFolder + "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz", GWAS = gwas_data, QTL = qtl_data)
@@ -32,11 +33,12 @@ rule run_MR:
         outFolder + "{GWAS}/{QTL}_{GWAS}_MR.tsv",
         #outFolder +  "{GWAS}/{QTL}_{GWAS}_SMR.RData"
     params:
-        script = "scripts/run_MR.R"
+        script = "scripts/run_MR.R",
+        fdr = fdr
     shell:
         "mkdir -p {outFolder}{wildcards.GWAS};"
         "ml R/4.2.0;" #ml arrow;"
-        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -f {wildcards.fdr} -o {outFolder}{wildcards.GWAS}/ "
+        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -f {params.fdr} -o {outFolder}{wildcards.GWAS}/ "
    
 rule merge_MR_snp_level:
     input:
@@ -45,10 +47,9 @@ rule merge_MR_snp_level:
         outFolder + "all_MR_results_merged_H4_0_snp.tsv.gz",
         outFolder + "all_MR_results_merged_H4_1_snp.tsv.gz"
     params:
-        script = "scripts/merge_MR_results.R"
+        script = "scripts/merge_MR_results.R",
+        fdr = fdr
     shell:
         "ml R/4.2.0;"
-        "Rscript {params.script} -f {wildcards.fdr} --threshold 0 --inFolder {outFolder} --geneMeta {geneMeta};" 
-        "Rscript {params.script} -f {wildcards.fdr} --threshold 1 --inFolder {outFolder} --geneMeta {geneMeta}"
-
-
+        "Rscript {params.script} -f {params.fdr} --threshold 0 --inFolder {outFolder} --geneMeta {geneMeta};" 
+        "Rscript {params.script} -f {params.fdr} --threshold 1 --inFolder {outFolder} --geneMeta {geneMeta}"
