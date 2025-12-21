@@ -8,3 +8,9 @@ __default__:
   output: logs/{rule}:{wildcards}.stdout
   error: logs/{rule}:{wildcards}.stderr
   himem: ""
+
+run_MR:
+  cores: 4,
+  mem: 6000,
+  time: "48:00",
+  queue: premium

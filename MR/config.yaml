@@ -22,6 +22,8 @@ qtl:
 
 outFolder: "./" 
 
+plink_bin: "/hpc/packages/minerva-centos7/plink/1.90b6.21/plink"
+run_MR_cores: 4
 FDR_option: TRUE
 
 geneMeta: "/sc/arion/projects/ad-omics/data/references//hg38_reference/GENCODE/gencode.v38.primary_assembly/gencode.v38.primary_assembly.tx2gene.tsv.gz"

@@ -21,18 +21,42 @@
 
 
 suppressPackageStartupMessages(library(tidyverse))
-# suppressPackageStartupMessages(library(coloc))
 suppressPackageStartupMessages(library(TwoSampleMR))
 suppressPackageStartupMessages(library(rtracklayer))
 suppressPackageStartupMessages(library(optparse))
 
 suppressPackageStartupMessages(library(GenomicRanges))
 suppressPackageStartupMessages(library(rtracklayer))
-# suppressPackageStartupMessages(library(LDlinkR))
+
+option_list <- list(
+  make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
+  make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database" ),
+  make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database"),
+  make_option(c('--fdr', '-f'), help = "the exposure filter option, if TRUE, use FDR < 0.05", default = FALSE),
+  make_option(c('--cores', '-c'), help = "the number of cores for parallelizing", default = 1),
+  make_option(c('--plink_bin'), help = "Path to plink binary (optional)", default = ""),
+  make_option(c('--debug'), help = "load all files and then save RData without running MR", action = "store_true", default = FALSE)
+)
+
+option.parser <- OptionParser(option_list=option_list)
+opt <- parse_args(option.parser)
 
 
+outFolder <- opt$outFolder
+gwas_dataset <- opt$gwas
+qtl_dataset <- opt$qtl
+fdr_filter <- opt$fdr
+debug <- opt$debug
+ncores <- opt$cores
+plink_bin <- opt$plink_bin
 
-#library(arrow)
+if (!is.null(plink_bin) && nzchar(plink_bin) && file.exists(plink_bin)) {
+  message("Using plink from config: ", plink_bin)
+  PLINK_BIN <- plink_bin
+} else {
+  message("Using genetics.binaRies::get_plink_binary()")
+  PLINK_BIN <- genetics.binaRies::get_plink_binary()
+}
 
 # flank coordinates by set number of bases (default 1MB)
 # work on either a coordinate string or a dataframe containing chr start and end columns
@@ -432,7 +456,6 @@ extractQTL_tabix <- function(qtl, coord){
     return(result)
 }
 
-
 # extract all nominal QTL P-values overlapping the flanked GWAS hit
 # split by Gene being tested
 # sig_level doesn't do anything yet
@@ -440,7 +463,6 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE){
     # variables stored in qtl
     # if qtl type is parquet then read in parquet files
     # if qtl type is tabix then query the coordinates through tabix 
-    
 
     # check columns
     stopifnot( all(!is.na(c(qtl$full_snp, qtl$full_pheno, qtl$full_p, qtl$N, qtl$build) ) ))
@@ -749,7 +771,7 @@ runMR <- function(gwas, qtl,  hit, sig_gene, fdr_filter){
                                          clump_r2 =  0.01,
                                          # pop = 'EUR', 
                                          # opengwas_jwt = Sys.getenv('LDCLUMP_TOKEN'),
-                                         plink_bin = genetics.binaRies::get_plink_binary(),
+                                         plink_bin = PLINK_BIN,                                         
                                          bfile ='/sc/arion/projects/ad-omics/data/references/LDreference/EUR'
            ) ), silent=FALSE)
          if (class(try_ld_clump) == "try-error"){
@@ -826,34 +848,6 @@ runMR <- function(gwas, qtl,  hit, sig_gene, fdr_filter){
     return(full_res) 
 }
 
-option_list <- list(
-        make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
-        make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database" ),
-        make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database"),
-        make_option(c('--fdr', '-f'), help = "the exposure filter option, if TRUE, use FDR < 0.05", default = FALSE),
-        make_option(c('--debug'), help = "load all files and then save RData without running MR", action = "store_true", default = FALSE)
-)
-
-option.parser <- OptionParser(option_list=option_list)
-opt <- parse_args(option.parser)
-
-
-outFolder <- opt$outFolder
-gwas_dataset <- opt$gwas
-qtl_dataset <- opt$qtl
-# coloc_path <- opt$coloc
-# H4_threshold <- opt$threshold
-fdr_filter <- opt$fdr
-debug <- opt$debug
-#gwas_prefix <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
-#qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30"
-#qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_splicing/peer20/LumbarSpinalCord_splicing_peer20"
-
-#hits_file <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/downstream-QTL/COLOC/Nicolas_2018/Nicolas_2018_hits_1e-7.tsv"
-#outFile <- "test_coloc_results.tsv"
-
-#options(echo = TRUE)
-
 # load in data
 # extract top GWAS loci
 # for each locus run COLOC
@@ -871,10 +865,6 @@ if( !exists("maf_1000g")){
 
 main <- function(){
     
-    #gwas_dataset <- "Bellenguez_2021"
-    #qtl_dataset <- "mmQTL_MG_expression_EUR"
-    #coloc_path <- '/sc/arion/projects/bigbrain/data/ROSMAP/analysis/downstream-QTL/COLOC/all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz'
-    
     if(fdr_filter){ 
       message("       * MR filter option : FDR")
     }else{
@@ -887,57 +877,45 @@ main <- function(){
     sig_gene <- extractQTL_top(qtl, fdr_filter)
     # stopifnot(is.null(sig_gene))
 
-    # head(coloc)
-      
       top_loci <- extractLoci(gwas)
-      #top_loci <- top_loci[11:18,]
       
-      # for testing
-      # top_loci <- top_loci[22,]
       if( debug == TRUE){ save.image("debug.RData") }
       
       MR_results =list()
       
-      for(i in 1:nrow(top_loci)){
-      # for(i in 41:45){
-        res <- runMR(gwas, qtl, hit = top_loci[i,], sig_gene, fdr_filter)
-        MR_results[[i]] = res
-        
-      }
+      MR_results <- mclapply(seq_len(nrow(top_loci)), function(i){
+         runMR(gwas, qtl, hit = top_loci[i,], sig_gene, fdr_filter)}, mc.cores = ncores)
+
       if( all(sapply(MR_results, is.null))){
           if(fdr_filter){
             all_res <- data.frame()
             outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_MR_wFDR.tsv")
-            message("       * MR finisehd : ", outFile)
-            readr::write_tsv(all_res, path = outFile)
+            message("       * MR finished : ", outFile)
+            readr::write_tsv(all_res, file = outFile)
     
           }else{
             all_res <- data.frame()
             outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_MR.tsv")
-            message("       * MR finisehd : ", outFile)
-            readr::write_tsv(all_res, path = outFile)
+            message("       * MR finished : ", outFile)
+            readr::write_tsv(all_res, file = outFile)
           }
       }else{
         MR_results = as.data.frame(do.call(rbind, MR_results))
         
-        # arrange by H4
         MR_results <- arrange(MR_results, desc(pval)  )
         print(head(MR_results))
         if(fdr_filter){
           outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_MR_wFDR.tsv")
-          message("       * MR finisehd : ", outFile)
-          readr::write_tsv(MR_results, path = outFile)
+          message("       * MR finished : ", outFile)
+          readr::write_tsv(MR_results, file = outFile)
           
         }else{
           outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_MR.tsv")
-          message("       * MR finisehd : ", outFile)
-          readr::write_tsv(MR_results, path = outFile)
+          message("       * MR finished : ", outFile)
+          readr::write_tsv(MR_results, file = outFile)
         }
       }
-        # save COLOC objects for plotting
-        #ave(all_obj, file = gsub("tsv", "RData", outFile))
 }
-      # print(warning())
     
 main()
 

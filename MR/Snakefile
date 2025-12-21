@@ -34,11 +34,13 @@ rule run_MR:
         #outFolder +  "{GWAS}/{QTL}_{GWAS}_SMR.RData"
     params:
         script = "scripts/run_MR.R",
-        fdr = fdr
+        fdr = fdr,
+        cores = config.get("run_MR_cores", 1),
+        plink_bin = config.get("plink_bin", "")
     shell:
         "mkdir -p {outFolder}{wildcards.GWAS};"
-        "ml R/4.2.0;" #ml arrow;"
-        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -f {params.fdr} -o {outFolder}{wildcards.GWAS}/ "
+        "ml R/4.2.0; ml plink2/2.3;" #ml arrow;"
+        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -f {params.fdr} --cores {params.cores} --plink_bin '{params.plink_bin}' -o {outFolder}{wildcards.GWAS}/ "
    
 rule merge_MR_snp_level:
     input:
