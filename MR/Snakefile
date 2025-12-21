@@ -28,10 +28,13 @@ rule all:
         #expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
         #outFolder + "all_COLOC_summary_results.tsv.gz"
 
+# compute suffix once using the config boolean (parsed from YAML)
+suffix = "_MR_wFDR.tsv" if config.get("FDR_option", False) else "_MR.tsv"
+
 rule run_MR:
     output:
-        outFolder + "{GWAS}/{QTL}_{GWAS}_MR.tsv",
-        #outFolder +  "{GWAS}/{QTL}_{GWAS}_SMR.RData"
+        #  use wildcard placeholders {GWAS} and {QTL}; build full filename string
+        os.path.join(outFolder, "{GWAS}", "{QTL}_{GWAS}" + suffix)
     params:
         script = "scripts/run_MR.R",
         fdr = fdr,
@@ -44,7 +47,7 @@ rule run_MR:
    
 rule merge_MR_snp_level:
     input:
-        expand( outFolder + "{GWAS}/{QTL}_{GWAS}_MR.tsv", GWAS = gwas_data, QTL = qtl_data )
+        expand(os.path.join(outFolder, "{GWAS}", "{QTL}_{GWAS}" + suffix), GWAS = gwas_data, QTL = qtl_data)
     output:
         outFolder + "all_MR_results_merged_H4_0_snp.tsv.gz",
         outFolder + "all_MR_results_merged_H4_1_snp.tsv.gz"

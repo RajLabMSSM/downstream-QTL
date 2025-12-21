@@ -27,6 +27,7 @@ suppressPackageStartupMessages(library(optparse))
 
 suppressPackageStartupMessages(library(GenomicRanges))
 suppressPackageStartupMessages(library(rtracklayer))
+suppressPackageStartupMessages(library(parallel))
 
 option_list <- list(
   make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
