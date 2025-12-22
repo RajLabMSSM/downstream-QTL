@@ -20,16 +20,14 @@ if not all([gwas_check, qtl_check]):
 
 shell.prefix("export PS1=""; ml anaconda3; CONDA_BASE=$(conda info --base); source $CONDA_BASE/etc/profile.d/conda.sh; ml purge; conda activate snakemake;")
 
-rule all:
-    input:
-        #expand(outFolder + "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz", GWAS = gwas_data, QTL = qtl_data)
-        outFolder + "all_MR_results_merged_H4_0_snp.tsv.gz",
-        outFolder + "all_MR_results_merged_H4_1_snp.tsv.gz",
-        #expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
-        #outFolder + "all_COLOC_summary_results.tsv.gz"
-
 # compute suffix once using the config boolean (parsed from YAML)
 suffix = "_MR_wFDR.tsv" if config.get("FDR_option", False) else "_MR.tsv"
+merged_suffix = "_wFDR" if config.get("FDR_option", False) else ""
+
+rule all:
+    input:
+        os.path.join(outFolder, "all_MR_results_merged_H4_0_snp" + merged_suffix + ".tsv.gz"),
+        os.path.join(outFolder, "all_MR_results_merged_H4_1_snp" + merged_suffix + ".tsv.gz")
 
 rule run_MR:
     output:
@@ -49,8 +47,8 @@ rule merge_MR_snp_level:
     input:
         expand(os.path.join(outFolder, "{GWAS}", "{QTL}_{GWAS}" + suffix), GWAS = gwas_data, QTL = qtl_data)
     output:
-        outFolder + "all_MR_results_merged_H4_0_snp.tsv.gz",
-        outFolder + "all_MR_results_merged_H4_1_snp.tsv.gz"
+        os.path.join(outFolder, "all_MR_results_merged_H4_0_snp" + merged_suffix + ".tsv.gz"),
+        os.path.join(outFolder, "all_MR_results_merged_H4_1_snp" + merged_suffix + ".tsv.gz")
     params:
         script = "scripts/merge_MR_results.R",
         fdr = fdr

@@ -33,15 +33,6 @@ fix_chr <- function(chr_string){
     }
     return(chr_string)
 }
-#inFolder <- "/sc/arion/projects/bigbrain/data/ROSMAP/analysis/downstream-QTL/MR/"
-#SNP_threshold <- 0
-# fdr_filter <- FALSE
-#fdr_filter <- TRUE
-#SNP_threshold <- 1
-# inFolder <- "/sc/arion/projects/bigbrain/data/ROSMAP/analysis/downstream-QTL/MR/"
-# SNP_threshold <- 0
-# fdr_filter <- TRUE
-# fdr_filter <- FALSE
 
 if(fdr_filter){
     outFile <- paste0(inFolder, "all_MR_results_merged_H4_", SNP_threshold, "_snp_wFDR.tsv.gz")
@@ -60,6 +51,8 @@ read_mr <- function(filename){
     res <- read_tsv(filename) 
     if(nrow(res)==0){return(NULL)}
     res$GWAS_P <- as.numeric(res$GWAS_P)
+    res$locus <- as.character(res$locus)
+    res$outcome <- as.character(res$outcome)
     return(res)
 }
 
