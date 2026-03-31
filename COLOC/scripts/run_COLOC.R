@@ -367,8 +367,8 @@ extractQTL_tabix <- function(qtl, coord){
 
 # extract all nominal QTL P-values overlapping the flanked GWAS hit
 # split by Gene being tested
-# sig_level doesn't do anything yet
-extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets = NULL){
+# now implemented sig_level filtering for minimum P-value for each phenotype
+extractQTL <- function(qtl, coord, sig_level = NULL, force_maf = FALSE, targets = NULL){
     # variables stored in qtl
     # if qtl type is parquet then read in parquet files
     # if qtl type is tabix then query the coordinates through tabix 
@@ -423,7 +423,18 @@ extractQTL <- function(qtl, coord, sig_level = 0.05, force_maf = FALSE, targets 
     if( pvalCol == "log10_p"){
         result$pvalues <- 10^result$pvalues
     }
-
+    # P-value thresholding - methylation QTLs, there are way too many sites to test all of them
+    if( !is.null(sig_level) ){
+        message_verbose(paste0(" currently: ", length(unique(result$gene) ), " phenotypes in window" ) )
+        message_verbose(paste0(" removing phenotypes with P < ", sig_level))
+        pheno_p <- result %>% dplyr::group_by(gene) %>% dplyr::slice_min(pvalues, n = 1, with_ties = FALSE) %>% dplyr::filter(pvalues < as.numeric(sig_level) )
+        result <- dplyr::filter(result, gene %in% pheno_p$gene)
+        if(nrow(result) == 0){
+            message_verbose(" 0 phenotypes remaining after P thresholding")
+            return(NULL)
+        }
+        message_verbose(paste0("retaining ", nrow(result), " associations from ", nrow(pheno_p), " phenotypes" ))
+    }
     # deal with MAF - meta-analysis outputs won't have it
     # this requires "chr" to be present in QTL data
     #if( debug == TRUE){ result$MAF <- NA }else{ # why do we do this? breaks it when debug is TRUE
@@ -582,7 +593,7 @@ runCOLOC <- function(gwas, qtl, qtl2 = NULL, hit, sig.level = NULL, target.file 
         qtl_range <- joinCoords(qtl_coord, flank = 1e6)
     }
     message_verbose("extracting QTLs")
-    q <- extractQTL(qtl, qtl_range, targets = target.file[1])
+    q <- extractQTL(qtl, qtl_range, targets = target.file[1], sig_level = sig.level)
     #print(names(q[[1]]))
     if( is.null(q) ){ return(NULL) }
     qtl_info <- getQTLinfo(q, hit_info)
@@ -827,7 +838,10 @@ main <- function(){
         names(all_obj) <- top_loci$locus
     }
     dir.create(outFolder,  showWarnings = FALSE)
-    all_res <- dplyr::arrange(all_res, desc(PP.H4.abf)  )
+    # in case all COLOCs are null for some reason
+    if(nrow(all_res) > 0){
+        all_res <- dplyr::arrange(all_res, desc(PP.H4.abf)  )
+    }
     message("finished COLOC pipeline")
     message_verbose(paste0("writing output to ", outFile))
     readr::write_tsv(all_res, file = outFile)

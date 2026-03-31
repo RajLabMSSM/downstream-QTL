@@ -11,10 +11,10 @@ pullData <- function(dataset, type = "GWAS"){
     message(Sys.time()," * reading GWAS database from ", db_path)
     stopifnot( file.exists(db_path) )
     if( type == "GWAS"){
-        n_sheet <- 3
+        n_sheet <- 2
     }
     if( type == "QTL"){
-        n_sheet <- 2
+        n_sheet <- 3
     }
     gwas_db <- suppressMessages(readxl::read_excel(db_path, sheet = n_sheet,na= c("", "-","NA")))
     
@@ -78,7 +78,7 @@ extractTargetQTL <- function(qtl, chr, source_qtls){
     stopifnot( file.exists(qtl$full_path) )
      
     # read in QTL
-    cmd <- paste0("ml bcftools; tabix ", qtl$full_path, " ", chr)
+    cmd <- paste0("ml tabix; tabix ", qtl$full_path, " ", chr)
     message( " * ", cmd) 
     result <- data.table::fread( cmd = cmd, nThread = 8 )
     if( nrow(result) == 0){ 

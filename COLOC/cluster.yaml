@@ -1,7 +1,7 @@
 __default__:
   queue: premium
   cores: 1
-  mem: 24000
+  mem: 48000
   time: '120'
   name: $(basename $(pwd)):{rule}:{wildcards}
   output: logs/{rule}:{wildcards}.stdout
@@ -9,5 +9,5 @@ __default__:
   himem: ""
 pairwise_QTL_COLOC:
   cores: 4
-  mem: 8000
+  mem: 16000
   time: 8640

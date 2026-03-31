@@ -5,7 +5,7 @@ gwas_data = config["gwas"]
 qtl_data = config["qtl"]
 outFolder = config["outFolder"]
 geneMeta = config["geneMeta"]
-
+sig_threshold = config["sig_threshold"]
 # sanity check - can the GWAS and QTL data be found in the database?
 gwas_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references//GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = 1)
 qtl_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references//GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = 2)
@@ -29,7 +29,7 @@ rule all:
         #expand(outFolder + "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz", GWAS = gwas_data, QTL = qtl_data)
         outFolder + "all_COLOC_results_merged_H4_0_no_LD.tsv.gz",
         outFolder + "all_COLOC_results_merged_H4_0.5_with_LD.tsv.gz",
-        outFolder + "pairwise_QTL_results.tsv.gz"
+        #outFolder + "pairwise_QTL_results.tsv.gz"
         #expand( outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv", GWAS = gwas_data, QTL = qtl_data )
         #outFolder + "all_COLOC_summary_results.tsv.gz"
 
@@ -41,8 +41,8 @@ rule run_COLOC:
         script = "scripts/run_COLOC.R"
     shell:
         "mkdir -p {outFolder}{wildcards.GWAS};"
-        "ml R/4.0.3;" #ml arrow;"
-        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -o {outFolder}{wildcards.GWAS}/ "
+        "ml R;" #ml arrow;"
+        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -o {outFolder}{wildcards.GWAS}/ -s 1e-5 --verbose --lowmem"
    
 rule merge_COLOC_snp_level:
     input:
@@ -53,7 +53,7 @@ rule merge_COLOC_snp_level:
     params:
         script = "scripts/merge_COLOC_results.R"
     shell:
-        "ml R/3.6.0;" # LDLINKR only installed on 3.6
+        "ml R;" # LDLINKR only installed on 3.6
         "Rscript {params.script} --threshold 0 --inFolder {outFolder} --geneMeta {geneMeta};" 
         "Rscript {params.script} --threshold 0.5 --ld --inFolder {outFolder} --geneMeta {geneMeta} "
 
