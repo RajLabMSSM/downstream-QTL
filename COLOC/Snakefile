@@ -5,6 +5,7 @@ gwas_data = config["gwas"]
 qtl_data = config["qtl"]
 outFolder = config["outFolder"]
 geneMeta = config["geneMeta"]
+threads = config.get("threads", 4) # Number of threads - used to parallelize run_COLOC rule
 
 # sanity check - can the GWAS and QTL data be found in the database?
 gwas_df = pd.read_excel("/sc/arion/projects/ad-omics/data/references/GWAS/GWAS-QTL_data_dictionary.xlsx", sheet_name = "GWAS")
@@ -31,11 +32,12 @@ rule run_COLOC:
         outFolder + "{GWAS}/{QTL}_{GWAS}_COLOC.tsv",
         outFolder +  "{GWAS}/{QTL}_{GWAS}_COLOC.RData"
     params:
-        script = "scripts/run_COLOC.R"
+        script = "scripts/run_COLOC.R",
+        threads = threads
     shell:
         "mkdir -p {outFolder}{wildcards.GWAS};"
         "ml R/4.2.0;" #ml arrow;"
-        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -o {outFolder}{wildcards.GWAS}/ "
+        "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} -o {outFolder}{wildcards.GWAS}/ -t {params.threads}"
    
 rule merge_COLOC_snp_level:
     input:
@@ -46,18 +48,6 @@ rule merge_COLOC_snp_level:
     params:
         script = "scripts/merge_COLOC_results.R"
     shell:
-        "ml R/4.2.0;"
+        "ml R/4.2.0; ml proxies"
         "Rscript {params.script} --threshold 0 --inFolder {outFolder} --geneMeta {geneMeta};" 
         "Rscript {params.script} --threshold 0.5 --ld --inFolder {outFolder} --geneMeta {geneMeta} "
-
-#rule create_LD_tables:
-#    input:
-#        outFolder +  "{GWAS}/{QTL}_{GWAS}_COLOC.RData"
-#    output:
-#        outFolder +  "{GWAS}/{QTL}/{QTL}_{GWAS}_coloc_results.snp.1kgp3_ld.tsv.gz"
-#    params:
-#        script = "scripts/prepare_gwas_qtls.R",
-#        out = outFolder +  "{GWAS}/{QTL}/"
-#    shell:
-#       "conda activate echoR;"
-#       "Rscript {params.script} -g {wildcards.GWAS} -q {wildcards.QTL} --inFile {input} --outFolder {params.out}" 

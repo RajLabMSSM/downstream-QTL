@@ -18,14 +18,14 @@
 # run COLOC to get different colocalisations
 # extract top QTL SNP for locus
 # record results in table - GWAS locus, Gene, top QTL SNP, COLOC probabilities
-suppressPackageStartupMessages(library(tidyverse))
 
-suppressPackageStartupMessages(library(coloc))
 suppressPackageStartupMessages(library(optparse))
-
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(coloc))
 suppressPackageStartupMessages(library(GenomicRanges))
 suppressPackageStartupMessages(library(rtracklayer))
-
+suppressPackageStartupMessages(library(parallel))
+suppressPackageStartupMessages(library(purrr))
 
 #library(arrow)
 
@@ -700,7 +700,8 @@ option_list <- list(
         make_option(c('-o', '--outFolder'), help='the path to the output file', default = ""),
         make_option(c('--gwas', '-g'), help= "the dataset ID for a GWAS in the GWAS/QTL database" ),
         make_option(c('--qtl', '-q'), help = "the dataset ID for a QTL dataset in the GWAS/QTL database"),
-        make_option(c('--debug'), help = "load all files and then save RData without running COLOC", action = "store_true", default = FALSE)
+        make_option(c('--debug'), help = "load all files and then save RData without running COLOC", action = "store_true", default = FALSE),
+        make_option(c("-t", "--threads"), type = "integer", default = 4, help = "Number of cores to use [default %default]")
 )
 
 option.parser <- OptionParser(option_list=option_list)
@@ -711,6 +712,10 @@ outFolder <- opt$outFolder
 gwas_dataset <- opt$gwas
 qtl_dataset <- opt$qtl
 debug <- opt$debug
+num_cores <- as.integer(opt$threads)
+
+message("Using ", num_cores, " cores for parallel processing")
+
 #gwas_prefix <- "/sc/arion/projects/als-omics/ALS_GWAS/Nicolas_2018/processed/Nicolas_2018_processed_"
 #qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_expression/peer30/LumbarSpinalCord_expression_peer30"
 #qtl_prefix <- "/sc/arion/projects/als-omics/QTL/NYGC_Freeze02_European_Feb2020/QTL-mapping-pipeline/results/LumbarSpinalCord_splicing/peer20/LumbarSpinalCord_splicing_peer20"
@@ -753,17 +758,32 @@ main <- function(){
     if( debug == TRUE){ save.image("debug.RData") }
  
      
-    all_coloc <- purrr::map(
-        1:nrow(top_loci), ~{
-            res <- runCOLOC(gwas, qtl, hit = top_loci[.x,])
-            if(is.null(res) ){return(NULL) }
-            return(res)
-        }
+    # all_coloc <- purrr::map(
+    #     1:nrow(top_loci), ~{
+    #         res <- runCOLOC(gwas, qtl, hit = top_loci[.x,])
+    #         if(is.null(res) ){return(NULL) }
+    #         return(res)
+    #     }
+    # )
+    
+    # Parallelizing the above part
+    all_coloc <- parallel::mclapply(
+      1:nrow(top_loci),
+      function(x) {
+        res <- runCOLOC(gwas, qtl, hit = top_loci[x, ])
+        if (is.null(res)) return(NULL)
+        res
+      },
+      mc.cores = min(num_cores, nrow(top_loci))
     )
+    
+    keep_idx <- !vapply(all_coloc, is.null, logical(1))
+    all_coloc <- all_coloc[keep_idx]
+    top_loci <- top_loci[keep_idx, , drop = FALSE]
+    
     all_res <- map_df(all_coloc, "full_res")
     all_obj <- map(all_coloc, "coloc_object")    
     names(all_obj) <- top_loci$locus
-    
     
     # arrange by H4
     all_res <- arrange(all_res, desc(PP.H4.abf)  )
@@ -818,9 +838,6 @@ main <- function(){
     outFile <- paste0(outFolder, qtl_dataset, "_", gwas_dataset, "_COLOC_credible.tsv")
     message(outFile)
     readr::write_tsv(all_credible, path = outFile)
-
-
-
 
 }
 

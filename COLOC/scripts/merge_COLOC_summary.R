@@ -27,20 +27,44 @@ all_res <- purrr::map_df(all_files, ~{
 
 
 # match in disease from GWAS name
-gwas_key <- 
-tribble(
+gwas_key <- tribble(
   ~GWAS, ~disease,
-    "Ripke_2014", "SCZ",
-    "Wray_2018", "MDD",
-    "IMSGC_2019", "MS",  
-    "Stahl_2019", "BPD",
-    "Daner_2020", "BPD",
-    "Nalls23andMe_2019", "PD",
-    "Lambert_2013", "AD",
-    "Marioni_2018", "AD",
-    "Jansen_2018",  "AD",
-    "Kunkle_2019",  "AD",
-    "Nicolas_2018", "ALS",
+  "Ripke_2014",              "SCZ",
+  "Wray_2018",               "MDD",
+  "IMSGC_2019",              "MS",
+  "Stahl_2019",              "BPD",
+  "Daner_2020",              "BPD",
+  "Nalls23andMe_2019",       "PD",
+  "Lambert_2013",            "AD",
+  "Marioni_2018",            "AD",
+  "Jansen_2018",             "AD",
+  "Kunkle_2019",             "AD",
+  "NicolasSuggestive_2018",  "ALS",
+  "Pottier_2019",            "FTD",
+  "Bellenguez_2021",         "AD",
+  "VanRheenenEUR_2021",      "ALS",
+  "VanRheenenASN_2021",      "ALS",
+  "VanRheenenALL_2021",      "ALS",
+  "Mullins_2021",            "BPD",
+  "Farrell_2024",            "PSP",
+  "TrubetskoyEUR_2022",      "SCZ",
+  "LBD_AMPPD2023",           "LBD",
+  "ABETA_2024",              "Abeta",
+  "Yengo_2022",              "Height",
+  "Ishigaki_2022",           "RA",
+  "Belloy_2023APOE4",        "AD_APOE4",
+  "Belloy_2023nonAPOE4",     "AD_noAPOE4",
+  "Jones_2020",              "sCJD",
+  "Chia_2024additive",       "MSA",
+  "Chia_2024recessive",      "MSA",
+  "Manzoni_2024",            "sFTLD",
+  "MDD_2025",                "MDD",
+  "Hatzikotoulas_2025",      "OA",
+  "GP2_2025",                "PD",
+  "GP2_clinical2025",        "PD_case_control",
+  "Belloy_2025APOE4",        "AD_APOE4",
+  "Belloy_2025nonAPOE4",     "AD_noAPOE4",
+  "Chang_2017",              "PD"
 )
 
 all_res <- left_join(all_res, gwas_key, by = "GWAS")
