@@ -48,6 +48,6 @@ rule merge_COLOC_snp_level:
     params:
         script = "scripts/merge_COLOC_results.R"
     shell:
-        "ml R/4.2.0; ml proxies"
+        "ml R/4.2.0; ml proxies; "
         "Rscript {params.script} --threshold 0 --inFolder {outFolder} --geneMeta {geneMeta};" 
         "Rscript {params.script} --threshold 0.5 --ld --inFolder {outFolder} --geneMeta {geneMeta} "
